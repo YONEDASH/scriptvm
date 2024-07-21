@@ -49,6 +49,13 @@ func (v *VM) Execute(bc Bytecode) error {
 			v.load(instr.Arg.(string))
 		case STORE:
 			v.store(instr.Arg.(string))
+		case JUMP:
+			i = instr.Arg.(int) - 1
+		case JUMP_F:
+			value := v.stack.Pop()
+			if value == nil || value.(float64) == 0 {
+				i = instr.Arg.(int) - 1
+			}
 		case ENTER:
 			v.global = newScope(v.global)
 		case LEAVE:
@@ -57,7 +64,7 @@ func (v *VM) Execute(bc Bytecode) error {
 			}
 			v.global = v.global.Parent
 		case CALL:
-			v.call(instr.Arg)
+			//v.call(instr.Arg)
 		case RET:
 			//return
 		default:
@@ -92,22 +99,26 @@ func (v *VM) div() {
 }
 
 func (v *VM) declare(s string) {
-	v.global.Declare(s, v.stack.Pop())
+	v.global.Declare(string(s), v.stack.Pop())
 }
 
 func (v *VM) load(key string) {
-	val := v.global.Get(key)
+	val := v.global.Get(string(key))
 	v.stack.Push(val)
 }
 
 func (v *VM) store(s string) {
-	v.global.Assign(s, v.stack.Pop())
+	v.global.Assign(string(s), v.stack.Pop())
 }
 
-func (v *VM) call(arg any) {
-	if fn, ok := arg.(func(*VM)); ok {
-		fn(v)
-	} else {
-		panic("not a function")
-	}
-}
+//func (v *VM) call(arg Value) {
+//	if fn, ok := arg.(*Func); ok {
+//		argCount := v.stack.Pop().(Number)
+//
+//		for i := 0; i < len(fn.Params) && Number(i) < argCount; i++ {
+//			v.global.Declare(fn.Params[i], v.stack.Pop())
+//		}
+//	} else {
+//		panic("not a function")
+//	}
+//}

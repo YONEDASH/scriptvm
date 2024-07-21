@@ -25,9 +25,28 @@ func compileStmt(bc *vm.Bytecode, stmt ast.Stmt) error {
 		return compileAssignStmt(bc, s)
 	case *ast.BlockStmt:
 		return compileBlockStmt(bc, s)
+	case *ast.ConditionalStmt:
+		return compileIfStmt(bc, s)
 	default:
 		return ast.NewNodeError(stmt, fmt.Sprintf("unknown statement type %T", stmt))
 	}
+}
+
+func compileIfStmt(bc *vm.Bytecode, s *ast.ConditionalStmt) error {
+	if err := compileExpr(bc, s.Cond); err != nil {
+		return err
+	}
+
+	buffer := make(vm.Bytecode, 0)
+
+	if err := compileBlockStmt(&buffer, s.Block); err != nil {
+		return err
+	}
+
+	bc.Instruction(vm.JUMP_F, bc.Len()+buffer.Len()+1)
+	bc.AppendBytecode(buffer)
+
+	return nil
 }
 
 func compileDeclareStmt(bc *vm.Bytecode, s *ast.DeclareStmt) error {

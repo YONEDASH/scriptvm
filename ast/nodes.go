@@ -161,6 +161,18 @@ func (a *AssignStmt) String() string {
 
 func (a *AssignStmt) stmt() {}
 
-//type IfStmt struct {
-//	Cond Expr
-//}
+type ConditionalStmt struct {
+	Cond  Expr
+	Block *BlockStmt
+	Else  Stmt // TODO: else
+}
+
+func (i *ConditionalStmt) Tok() lexer.Token {
+	return i.Cond.Tok()
+}
+
+func (i *ConditionalStmt) String() string {
+	return script.Stringify(i)
+}
+
+func (i *ConditionalStmt) stmt() {}

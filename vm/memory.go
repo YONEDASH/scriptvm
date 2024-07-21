@@ -1,5 +1,7 @@
 package vm
 
+import "fmt"
+
 func newScope(parent *Scope) *Scope {
 	return &Scope{
 		Parent:   parent,
@@ -20,10 +22,12 @@ func (s *Scope) Assign(name string, v any) {
 		return
 	}
 	s.Declared[name] = v
+	fmt.Println("[SCOPE] ASSIGN", name, v)
 }
 
 func (s *Scope) Declare(name string, v any) {
 	s.Declared[name] = v
+	fmt.Println("[SCOPE] DECLARE", name, v)
 }
 
 func (s *Scope) Get(name string) any {
@@ -34,38 +38,4 @@ func (s *Scope) Get(name string) any {
 		return s.Parent.Get(name)
 	}
 	return nil
-}
-
-type Data interface {
-	Val() any
-}
-
-type Number struct {
-	Value float64
-}
-
-func (n *Number) Val() any {
-	return n.Value
-}
-
-type String struct {
-	Value string
-}
-
-func (s *String) Val() any {
-	return s.Value
-}
-
-func AsNumber(data Data) float64 {
-	if n, ok := data.(*Number); ok {
-		return n.Value
-	}
-	return 0
-}
-
-func AsString(data Data) string {
-	if s, ok := data.(*String); ok {
-		return s.Value
-	}
-	return ""
 }

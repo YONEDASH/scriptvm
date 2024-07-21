@@ -30,9 +30,17 @@ func Parse(tokens []lexer.Token) (*Program, []error) {
 			p.recover()
 			continue
 		}
-		if node != nil {
-			program.Statements = append(program.Statements, node)
+		if node == nil {
+			continue
 		}
+
+		if err = p.expectLF(); err != nil {
+			p.errors = append(p.errors, err)
+			p.recover()
+			continue
+		}
+
+		program.Statements = append(program.Statements, node)
 	}
 
 	return program, p.errors
@@ -80,8 +88,28 @@ func (p *parser) expect(id lexer.TokenId, msg string) (lexer.Token, error) {
 }
 
 func (p *parser) expectLF() error {
-	_, err := p.expect(lexer.LF, "LF")
-	return err
+	switch p.get(0).Id {
+	case lexer.LF:
+		_, err := p.expect(lexer.LF, "LF")
+		return err
+	default:
+		_, err := p.expect(lexer.EOF, "LF or EOF")
+		return err
+	}
+}
+
+func (p *parser) expectLFB() error {
+	switch p.get(0).Id {
+	case lexer.LF:
+		_, err := p.expect(lexer.LF, "LF")
+		return err
+	case lexer.CLOSE_BRACE:
+		_, err := p.expect(lexer.LF, "Close Brace")
+		return err
+	default:
+		_, err := p.expect(lexer.EOF, "LF, close brace or EOF")
+		return err
+	}
 }
 
 func (p *parser) parseStmt() (Stmt, error) {
@@ -90,7 +118,9 @@ func (p *parser) parseStmt() (Stmt, error) {
 		p.index++
 		return nil, nil
 	case lexer.OPEN_BRACE:
-		return p.parseBlockStmt(true)
+		return p.parseBlockStmt()
+	case lexer.IF:
+		return p.parseIfStmt()
 	default:
 	}
 
@@ -102,6 +132,26 @@ func (p *parser) parseStmt() (Stmt, error) {
 	default:
 		return nil, lexer.NewTokError(p.get(0), "expected statement")
 	}
+}
+
+func (p *parser) parseIfStmt() (Stmt, error) {
+	if _, err := p.expect(lexer.IF, "expected if"); err != nil {
+		return nil, err
+	}
+	expr, err := p.parseExpr()
+	if err != nil {
+		return nil, errors.Join(err, lexer.NewTokError(p.get(0), "if statement"))
+	}
+
+	block, err := p.parseBlockStmt()
+	if err != nil {
+		return nil, errors.Join(err, lexer.NewTokError(p.get(0), "if statement"))
+	}
+
+	return &ConditionalStmt{
+		Cond:  expr,
+		Block: block,
+	}, nil
 }
 
 func (p *parser) parseDeclareStmt() (Stmt, error) {
@@ -122,7 +172,7 @@ func (p *parser) parseDeclareStmt() (Stmt, error) {
 	return &DeclareStmt{
 		Ident: ident,
 		Expr:  expr,
-	}, p.expectLF()
+	}, nil
 }
 
 func (p *parser) parseAssignStmt() (Stmt, error) {
@@ -143,10 +193,10 @@ func (p *parser) parseAssignStmt() (Stmt, error) {
 	return &AssignStmt{
 		Ident: ident,
 		Expr:  expr,
-	}, p.expectLF()
+	}, nil
 }
 
-func (p *parser) parseBlockStmt(lf bool) (*BlockStmt, error) {
+func (p *parser) parseBlockStmt() (*BlockStmt, error) {
 	if _, err := p.expect(lexer.OPEN_BRACE, "open brace"); err != nil {
 		return nil, err
 	}
@@ -169,6 +219,10 @@ func (p *parser) parseBlockStmt(lf bool) (*BlockStmt, error) {
 			continue
 		}
 
+		if err = p.expectLFB(); err != nil {
+			return nil, err
+		}
+
 		block.Statements = append(block.Statements, stmt)
 	}
 
@@ -176,10 +230,7 @@ func (p *parser) parseBlockStmt(lf bool) (*BlockStmt, error) {
 		return nil, err
 	}
 
-	if !lf {
-		return block, nil
-	}
-	return block, p.expectLF()
+	return block, nil
 }
 
 func (p *parser) parseExpr() (Expr, error) {
@@ -210,7 +261,7 @@ func (p *parser) parseBinaryExprAdditive() (Expr, error) {
 }
 
 func (p *parser) parseBinaryExprMultiplicative() (Expr, error) {
-	left, err := p.parseFunction()
+	left, err := p.parsePrimary()
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +269,7 @@ func (p *parser) parseBinaryExprMultiplicative() (Expr, error) {
 	for p.get(0).Id == lexer.ASTERISK || p.get(0).Id == lexer.SLASH {
 		operator := p.consume()
 		var right Expr
-		if right, err = p.parseFunction(); err != nil {
+		if right, err = p.parsePrimary(); err != nil {
 			return nil, err
 		}
 
@@ -232,41 +283,27 @@ func (p *parser) parseBinaryExprMultiplicative() (Expr, error) {
 	return left, nil
 }
 
-func (p *parser) parseIdents() ([]*Identifier, error) {
-	if p.get(0).Id != lexer.OPEN_PAREN {
-		return nil, lexer.NewTokError(p.get(0), "expected open parenthesis for identifiers")
-	}
-
-	idents := make([]*Identifier, 0)
-	for !p.done() && p.get(0).Id != lexer.CLOSE_PAREN {
-		ident, err := p.parseIdent()
-		if err != nil {
-			return nil, errors.Join(err, lexer.NewTokError(p.get(0), "expected identifier"))
-		}
-		idents = append(idents, ident)
-	}
-
-	return idents, nil
-}
-
-func (p *parser) parseFunction() (Expr, error) {
-	if p.get(0).Id == lexer.OPEN_PAREN {
-		i := 0
-		for p.get(i).Id != lexer.EOF && p.get(i).Id != lexer.LF {
-			i++
-		}
-		if p.get(i-1).Id == lexer.OPEN_BRACE {
-			idents, err := p.parseIdents()
-			if err != nil {
-				return nil, err
-			}
-			block, err := p.parseBlockStmt(false)
-			return &FunctionExpr{Params: idents, Body: block}, err
-		}
-	}
-
-	return p.parsePrimary()
-}
+//
+//func (p *parser) parseIdents() ([]*Identifier, error) {
+//	if _, err := p.expect(lexer.OPEN_PAREN, "expected open paren for identifiers"); err != nil {
+//		return nil, err
+//	}
+//
+//	idents := make([]*Identifier, 0)
+//	for !p.done() && p.get(0).Id != lexer.CLOSE_PAREN {
+//		ident, err := p.parseIdent()
+//		if err != nil {
+//			return nil, errors.Join(err, lexer.NewTokError(p.get(0), "expected identifier"))
+//		}
+//		idents = append(idents, ident)
+//	}
+//
+//	if _, err := p.expect(lexer.CLOSE_PAREN, "expected close paren for identifiers"); err != nil {
+//		return nil, err
+//	}
+//
+//	return idents, nil
+//}
 
 func (p *parser) parsePrimary() (Expr, error) {
 	tk := p.get(0)
@@ -282,6 +319,23 @@ func (p *parser) parsePrimary() (Expr, error) {
 	case lexer.NUMBER:
 		return p.parseNumber()
 	case lexer.OPEN_PAREN:
+		//i := 0
+		//for {
+		//	id := p.get(i).Id
+		//	if id == lexer.EOF || id == lexer.LF || id == lexer.CLOSE_PAREN {
+		//		break
+		//	}
+		//	i++
+		//}
+		//if p.get(i).Id == lexer.CLOSE_PAREN && p.get(i+1).Id == lexer.OPEN_BRACE {
+		//	idents, err := p.parseIdents()
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	block, err := p.parseBlockStmt()
+		//	return &FunctionExpr{Params: idents, Body: block}, err
+		//}
+
 		p.consume()
 		expr, err := p.parseExpr()
 		if err != nil {
