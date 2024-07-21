@@ -1,0 +1,4 @@
+assert(10+5, 15, "addition")
+assert(7-3, 4, "subtraction")
+assert(3*7, 21, "multiplication")
+assert(15/3, 3, "division")
