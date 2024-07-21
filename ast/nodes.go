@@ -85,6 +85,21 @@ func (b *BinaryExpr) String() string {
 
 func (b *BinaryExpr) expr() {}
 
+type FunctionExpr struct {
+	Params []*Identifier
+	Body   *BlockStmt
+}
+
+func (f *FunctionExpr) Tok() lexer.Token {
+	return f.Params[0].Tok()
+}
+
+func (f *FunctionExpr) String() string {
+	return script.Stringify(f)
+}
+
+func (f *FunctionExpr) expr() {}
+
 //type ExprStmt struct {
 //	Expr Expr
 //}
@@ -113,3 +128,39 @@ func (d *DeclareStmt) String() string {
 }
 
 func (d *DeclareStmt) stmt() {}
+
+type BlockStmt struct {
+	Statements []Stmt
+}
+
+func (b *BlockStmt) Tok() lexer.Token {
+	if len(b.Statements) == 0 {
+		return lexer.Token{Id: lexer.EOF, Pos: -1}
+	}
+	return b.Statements[0].Tok()
+}
+
+func (b *BlockStmt) String() string {
+	return script.Stringify(b)
+}
+
+func (b *BlockStmt) stmt() {}
+
+type AssignStmt struct {
+	Ident *Identifier
+	Expr  Expr
+}
+
+func (a *AssignStmt) Tok() lexer.Token {
+	return a.Ident.Tok()
+}
+
+func (a *AssignStmt) String() string {
+	return script.Stringify(a)
+}
+
+func (a *AssignStmt) stmt() {}
+
+//type IfStmt struct {
+//	Cond Expr
+//}

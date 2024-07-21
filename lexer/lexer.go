@@ -77,11 +77,10 @@ func (t *tokenizer) pushBuffer() {
 	start := t.pos - l
 	lexeme := string(t.buffer)
 
-	id := INVALID
+	id := IDENTIFIER
 
-	switch lexeme {
-	default:
-		id = IDENTIFIER
+	if keyword, ok := keywords[lexeme]; ok {
+		id = keyword
 	}
 
 	t.buffer.Clear()
@@ -138,6 +137,10 @@ func Tokenize(input []byte) ([]Token, []error) {
 			tr.push(OPEN_PAREN, tr.lex(0, 1))
 		case ')':
 			tr.push(CLOSE_PAREN, tr.lex(0, 1))
+		case '{':
+			tr.push(OPEN_BRACE, tr.lex(0, 1))
+		case '}':
+			tr.push(CLOSE_BRACE, tr.lex(0, 1))
 		default:
 			if unicode.IsLetter(r) || (tr.buffer.Len() > 0 && unicode.IsDigit(r)) {
 				tr.buffer.Append(r)

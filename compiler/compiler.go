@@ -21,6 +21,10 @@ func compileStmt(bc *vm.Bytecode, stmt ast.Stmt) error {
 	switch s := stmt.(type) {
 	case *ast.DeclareStmt:
 		return compileDeclareStmt(bc, s)
+	case *ast.AssignStmt:
+		return compileAssignStmt(bc, s)
+	case *ast.BlockStmt:
+		return compileBlockStmt(bc, s)
 	default:
 		return ast.NewNodeError(stmt, fmt.Sprintf("unknown statement type %T", stmt))
 	}
@@ -30,7 +34,26 @@ func compileDeclareStmt(bc *vm.Bytecode, s *ast.DeclareStmt) error {
 	if err := compileExpr(bc, s.Expr); err != nil {
 		return err
 	}
+	bc.Instruction(vm.DECLARE, s.Ident.Symbol)
+	return nil
+}
+
+func compileAssignStmt(bc *vm.Bytecode, s *ast.AssignStmt) error {
+	if err := compileExpr(bc, s.Expr); err != nil {
+		return err
+	}
 	bc.Instruction(vm.STORE, s.Ident.Symbol)
+	return nil
+}
+
+func compileBlockStmt(bc *vm.Bytecode, s *ast.BlockStmt) error {
+	bc.Instruction(vm.ENTER, nil)
+	for _, stmt := range s.Statements {
+		if err := compileStmt(bc, stmt); err != nil {
+			return err
+		}
+	}
+	bc.Instruction(vm.LEAVE, nil)
 	return nil
 }
 

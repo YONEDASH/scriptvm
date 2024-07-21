@@ -43,10 +43,19 @@ func (v *VM) Execute(bc Bytecode) error {
 			v.mul()
 		case DIV:
 			v.div()
+		case DECLARE:
+			v.declare(instr.Arg.(string))
 		case LOAD:
 			v.load(instr.Arg.(string))
 		case STORE:
 			v.store(instr.Arg.(string))
+		case ENTER:
+			v.global = newScope(v.global)
+		case LEAVE:
+			if v.global.Parent == nil {
+				return fmt.Errorf("cannot leave global scope")
+			}
+			v.global = v.global.Parent
 		case CALL:
 			v.call(instr.Arg)
 		case RET:
@@ -82,13 +91,17 @@ func (v *VM) div() {
 	v.stack.Push(left.(float64) / right.(float64))
 }
 
+func (v *VM) declare(s string) {
+	v.global.Declare(s, v.stack.Pop())
+}
+
 func (v *VM) load(key string) {
 	val := v.global.Get(key)
 	v.stack.Push(val)
 }
 
 func (v *VM) store(s string) {
-	v.global.Set(s, v.stack.Pop())
+	v.global.Assign(s, v.stack.Pop())
 }
 
 func (v *VM) call(arg any) {

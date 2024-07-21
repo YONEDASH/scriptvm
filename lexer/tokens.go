@@ -31,14 +31,19 @@ const (
 	SLASH
 	EQUALS
 	COLON
+
 	OPEN_PAREN
 	CLOSE_PAREN
+	OPEN_BRACE
+	CLOSE_BRACE
 
 	COLON_EQUALS // :=
 
-	LET
+	IF
+	ELSE
 )
 
 var keywords = map[string]TokenId{
-	"let": LET,
+	"if":   IF,
+	"else": ELSE,
 }

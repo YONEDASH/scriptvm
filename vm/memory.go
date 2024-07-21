@@ -12,7 +12,17 @@ type Scope struct {
 	Declared map[string]any
 }
 
-func (s *Scope) Set(name string, v any) {
+func (s *Scope) Assign(name string, v any) {
+	if _, ok := s.Declared[name]; !ok {
+		if s.Parent != nil {
+			s.Parent.Assign(name, v)
+		}
+		return
+	}
+	s.Declared[name] = v
+}
+
+func (s *Scope) Declare(name string, v any) {
 	s.Declared[name] = v
 }
 

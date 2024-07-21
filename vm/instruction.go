@@ -43,8 +43,13 @@ const (
 	MUL
 	DIV
 
-	LOAD
+	DECLARE
 	STORE
+	LOAD
+
+	// ENTER and LEAVE are used to create/exit a scope.
+	ENTER
+	LEAVE
 
 	CALL
 	RET

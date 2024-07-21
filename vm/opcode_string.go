@@ -15,15 +15,18 @@ func _() {
 	_ = x[SUB-4]
 	_ = x[MUL-5]
 	_ = x[DIV-6]
-	_ = x[LOAD-7]
+	_ = x[DECLARE-7]
 	_ = x[STORE-8]
-	_ = x[CALL-9]
-	_ = x[RET-10]
+	_ = x[LOAD-9]
+	_ = x[ENTER-10]
+	_ = x[LEAVE-11]
+	_ = x[CALL-12]
+	_ = x[RET-13]
 }
 
-const _OpCode_name = "INVALIDPUSHPOPADDSUBMULDIVLOADSTORECALLRET"
+const _OpCode_name = "INVALIDPUSHPOPADDSUBMULDIVDECLARESTORELOADENTERLEAVECALLRET"
 
-var _OpCode_index = [...]uint8{0, 7, 11, 14, 17, 20, 23, 26, 30, 35, 39, 42}
+var _OpCode_index = [...]uint8{0, 7, 11, 14, 17, 20, 23, 26, 33, 38, 42, 47, 52, 56, 59}
 
 func (i OpCode) String() string {
 	if i >= OpCode(len(_OpCode_index)-1) {
