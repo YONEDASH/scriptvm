@@ -45,7 +45,7 @@ func compileIfStmt(bc *vm.Bytecode, s *ast.ConditionalStmt) error {
 
 	bc.Instruction(vm.JUMP_F, bc.Len()+buffer.Len()+1)
 	bc.AppendBytecode(buffer)
-
+// bc.Instruction(vm.LABEL, "if#")
 	return nil
 }
 
