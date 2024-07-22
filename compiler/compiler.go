@@ -44,7 +44,6 @@ func compileIfStmt(bc *vm.Bytecode, s *ast.ConditionalStmt) error {
 	}
 
 	bc.SetArg(jumpIndex, bc.Len())
-	// bc.Instruction(vm.LABEL....)
 
 	return nil
 }
@@ -82,6 +81,10 @@ func compileExpr(bc *vm.Bytecode, expr ast.Expr) error {
 		if err := compileBinaryExpr(bc, e); err != nil {
 			return err
 		}
+	case *ast.UnaryExpr:
+		if err := compileUnaryExpr(bc, e); err != nil {
+			return err
+		}
 	case *ast.Number:
 		if err := compileNumber(bc, e); err != nil {
 			return err
@@ -104,10 +107,66 @@ func compileNumber(bc *vm.Bytecode, e *ast.Number) error {
 }
 
 func compileBinaryExpr(bc *vm.Bytecode, e *ast.BinaryExpr) error {
-	if err := compileExpr(bc, e.Right); err != nil {
+	// Check for operations that will short circuit
+	switch e.Operator {
+	case lexer.PIPE_PIPE:
+		if err := compileExpr(bc, e.Left); err != nil {
+			return err
+		}
+		jumpTrueIndex := bc.Len()
+		bc.Instruction(vm.JUMP_T, -1)
+
+		// If not true
+		if err := compileExpr(bc, e.Right); err != nil {
+			return err
+		}
+		secondTrueIndex := bc.Len()
+		bc.Instruction(vm.JUMP_T, -1)
+
+		// If false
+		bc.Instruction(vm.PUSH, false) // <- will arrive here if false
+		exitIndex := bc.Len()
+		bc.Instruction(vm.JUMP, -1)
+
+		// If true
+		bc.SetArg(jumpTrueIndex, bc.Len())
+		bc.SetArg(secondTrueIndex, bc.Len())
+		bc.Instruction(vm.PUSH, true) // <- jump here if true
+		bc.SetArg(exitIndex, bc.Len())
+
+		return nil
+	case lexer.AND_AND:
+		if err := compileExpr(bc, e.Left); err != nil {
+			return err
+		}
+		jumpFalseIndex := bc.Len()
+		bc.Instruction(vm.JUMP_F, -1)
+
+		// If not true
+		if err := compileExpr(bc, e.Right); err != nil {
+			return err
+		}
+		secondFalseIndex := bc.Len()
+		bc.Instruction(vm.JUMP_F, -1)
+
+		// If true
+		bc.Instruction(vm.PUSH, true) // <- will arrive here if true
+		exitIndex := bc.Len()
+		bc.Instruction(vm.JUMP, -1)
+
+		// If false
+		bc.SetArg(jumpFalseIndex, bc.Len())
+		bc.SetArg(secondFalseIndex, bc.Len())
+		bc.Instruction(vm.PUSH, false) // <- jump here if false
+		bc.SetArg(exitIndex, bc.Len())
+
+		return nil
+	}
+
+	if err := compileExpr(bc, e.Left); err != nil {
 		return err
 	}
-	if err := compileExpr(bc, e.Left); err != nil {
+	if err := compileExpr(bc, e.Right); err != nil {
 		return err
 	}
 	switch e.Operator {
@@ -119,8 +178,40 @@ func compileBinaryExpr(bc *vm.Bytecode, e *ast.BinaryExpr) error {
 		bc.Instruction(vm.MUL, nil)
 	case lexer.SLASH:
 		bc.Instruction(vm.DIV, nil)
+	case lexer.EQUALS_EQUALS:
+		bc.Instruction(vm.CMP, nil)
+	case lexer.EXCLAMATION_EQUALS:
+		bc.Instruction(vm.CMP, nil)
+		bc.Instruction(vm.NOT, nil)
+	case lexer.LESS_THAN:
+		bc.Instruction(vm.CMP_LT, nil)
+	case lexer.GREATER_THAN:
+		bc.Instruction(vm.CMP_GT, nil)
+	case lexer.LESS_THAN_EQUALS:
+		bc.Instruction(vm.CMP_LTE, nil)
+	case lexer.GREATER_THAN_EQUALS:
+		bc.Instruction(vm.CMP_GTE, nil)
 	default:
 		return ast.NewNodeError(e, "unknown operator in binary expression")
+	}
+
+	return nil
+}
+
+func compileUnaryExpr(bc *vm.Bytecode, e *ast.UnaryExpr) error {
+	if err := compileExpr(bc, e.Expr); err != nil {
+		return err
+	}
+
+	switch e.Operator {
+	case lexer.EXCLAMATION:
+		bc.Instruction(vm.NOT, nil)
+	case lexer.MINUS:
+		bc.Instruction(vm.NEG, nil)
+	case lexer.PLUS:
+		// Do nothing
+	default:
+		return ast.NewNodeError(e, "unknown operator in unary expression")
 	}
 
 	return nil
