@@ -128,14 +128,32 @@ func (p *parser) parseStmt() (Stmt, error) {
 	default:
 	}
 
-	switch p.get(1).Id {
-	case lexer.COLON_EQUALS:
-		return p.parseDeclareStmt()
-	case lexer.EQUALS:
-		return p.parseAssignStmt()
-	default:
-		return nil, lexer.NewTokError(p.get(0), "expected statement")
+	expr, err := p.parseExpr()
+	if err != nil {
+		return nil, errors.Join(err, lexer.NewTokError(p.get(0), "expected statement"))
 	}
+
+	switch n := expr.(type) {
+	case *Identifier:
+		switch p.get(0).Id {
+		case lexer.COLON_EQUALS:
+			return p.parseDeclareStmt(n)
+		case lexer.EQUALS:
+			return p.parseAssignStmt(n)
+		default:
+			return nil, lexer.NewTokError(p.get(1), "expected statement (identifier)")
+		}
+	case *SubscriptExpr:
+		switch p.get(0).Id {
+		case lexer.EQUALS:
+			return p.parseArrayAssignStmt(n)
+		default:
+			return nil, lexer.NewTokError(p.get(1), "expected statement (subscript)")
+		}
+	default:
+		return nil, lexer.NewTokError(p.get(1), fmt.Sprintf("expected statement (%T)", n))
+	}
+
 }
 
 func (p *parser) parseConditionalStmt() (Stmt, error) {
@@ -187,13 +205,8 @@ func (p *parser) parseReturnStmt() (Stmt, error) {
 	}, nil
 }
 
-func (p *parser) parseDeclareStmt() (Stmt, error) {
-	ident, err := p.parseIdent()
-	if err != nil {
-		return nil, errors.Join(err, lexer.NewTokError(p.get(-1), "expected identifier"))
-	}
-
-	if _, err = p.expect(lexer.COLON_EQUALS, "expected :="); err != nil {
+func (p *parser) parseDeclareStmt(ident *Identifier) (Stmt, error) {
+	if _, err := p.expect(lexer.COLON_EQUALS, "expected :="); err != nil {
 		return nil, err
 	}
 
@@ -208,13 +221,8 @@ func (p *parser) parseDeclareStmt() (Stmt, error) {
 	}, nil
 }
 
-func (p *parser) parseAssignStmt() (Stmt, error) {
-	ident, err := p.parseIdent()
-	if err != nil {
-		return nil, errors.Join(err, lexer.NewTokError(p.get(0), "expected identifier"))
-	}
-
-	if _, err = p.expect(lexer.EQUALS, "expected ="); err != nil {
+func (p *parser) parseAssignStmt(ident *Identifier) (Stmt, error) {
+	if _, err := p.expect(lexer.EQUALS, "expected ="); err != nil {
 		return nil, err
 	}
 
@@ -225,6 +233,28 @@ func (p *parser) parseAssignStmt() (Stmt, error) {
 
 	return &AssignStmt{
 		Ident: ident,
+		Expr:  expr,
+	}, nil
+}
+
+func (p *parser) parseArrayAssignStmt(sub *SubscriptExpr) (Stmt, error) {
+	//ident, ok := sub.Array.(*Identifier)
+	//if !ok {
+	//	return nil, lexer.NewTokError(p.get(0), "expected identifier in array assign")
+	//}
+
+	if _, err := p.expect(lexer.EQUALS, "expected ="); err != nil {
+		return nil, err
+	}
+
+	expr, err := p.parseExpr()
+	if err != nil {
+		return nil, errors.Join(err, lexer.NewTokError(p.get(0), "expected expression"))
+	}
+
+	return &ArrayAssignStmt{
+		Ident: sub.Array,
+		Index: sub.Index,
 		Expr:  expr,
 	}, nil
 }

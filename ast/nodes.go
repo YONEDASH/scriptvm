@@ -223,6 +223,22 @@ func (a *AssignStmt) String() string {
 
 func (a *AssignStmt) stmt() {}
 
+type ArrayAssignStmt struct {
+	Ident Expr
+	Expr  Expr
+	Index Expr
+}
+
+func (a *ArrayAssignStmt) Tok() lexer.Token {
+	return a.Ident.Tok()
+}
+
+func (a *ArrayAssignStmt) String() string {
+	return script.Stringify(a)
+}
+
+func (a *ArrayAssignStmt) stmt() {}
+
 type ConditionalStmt struct {
 	Cond  Expr
 	Block *BlockStmt

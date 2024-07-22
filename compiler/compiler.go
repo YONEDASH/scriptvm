@@ -35,6 +35,8 @@ func compileStmt(bc *vm.Bytecode, stmt ast.Stmt) error {
 		return compileConditionalStmt(bc, s)
 	case *ast.ReturnStmt:
 		return compileReturnStmt(bc, s)
+	case *ast.ArrayAssignStmt:
+		return compileArrayAssignStmt(bc, s)
 	default:
 		return ast.NewNodeError(stmt, fmt.Sprintf("unknown statement type %T", stmt))
 	}
@@ -163,6 +165,20 @@ func compileExpr(bc *vm.Bytecode, expr ast.Expr) error {
 	default:
 		return ast.NewNodeError(expr, fmt.Sprintf("unknown expression type %T", expr))
 	}
+	return nil
+}
+
+func compileArrayAssignStmt(bc *vm.Bytecode, s *ast.ArrayAssignStmt) error {
+	if err := compileExpr(bc, s.Expr); err != nil {
+		return err
+	}
+	if err := compileExpr(bc, s.Ident); err != nil {
+		return err
+	}
+	if err := compileExpr(bc, s.Index); err != nil {
+		return err
+	}
+	bc.Instruction(vm.ARR_V, nil)
 	return nil
 }
 

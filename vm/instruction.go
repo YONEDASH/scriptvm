@@ -60,6 +60,8 @@ const (
 	ARR_CR
 	// ARR_ID Indexes into an array. Value will be pushed on top of stack.
 	ARR_ID
+	// ARR_V Sets an array element. Value on top of stack followed by index.
+	ARR_V
 )
 
 type Bytecode []Instr

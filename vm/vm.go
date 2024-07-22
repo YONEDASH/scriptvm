@@ -35,6 +35,10 @@ const (
 )
 
 func (v *VM) Execute(bc Bytecode) error {
+	if debugStack {
+		fmt.Println(strings.TrimSpace(strings.ReplaceAll(script.Stringify(v.stack), "\n", "")))
+	}
+
 	for i := 0; i < len(bc); i++ {
 		instr := bc[i]
 		if debugInstructions {
@@ -106,6 +110,8 @@ func (v *VM) Execute(bc Bytecode) error {
 			v.arrayCreate()
 		case ARR_ID:
 			v.arrayIndex()
+		case ARR_V:
+			v.arraySet()
 		default:
 			return fmt.Errorf("unknown opcode %v in instruction %d", instr.Op, i)
 		}
@@ -235,10 +241,30 @@ func (v *VM) arrayIndex() {
 	index := int(v.stack.Pop().(float64))
 	arr := v.stack.Pop().([]any)
 
-	if index < 0 || index > len(arr) {
+	if index < 0 {
+		index = len(arr) + index
+	}
+
+	if index < 0 || index >= len(arr) {
 		v.stack.Push(nil)
 		return
 	}
 
 	v.stack.Push(arr[index])
+}
+
+func (v *VM) arraySet() {
+	index := int(v.stack.Pop().(float64))
+	arr := v.stack.Pop().([]any)
+
+	if index < 0 {
+		index = len(arr) + index
+	}
+
+	if index < 0 || index >= len(arr) {
+		//v.stack.Push(nil)
+		return
+	}
+
+	arr[index] = v.stack.Pop()
 }
