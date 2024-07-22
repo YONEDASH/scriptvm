@@ -145,6 +145,10 @@ func Tokenize(input []byte) ([]Token, []error) {
 			tr.push(OPEN_BRACE, tr.lex(0, 1))
 		case '}':
 			tr.push(CLOSE_BRACE, tr.lex(0, 1))
+		case '[':
+			tr.push(OPEN_BRACKET, tr.lex(0, 1))
+		case ']':
+			tr.push(CLOSE_BRACKET, tr.lex(0, 1))
 		case '<':
 			if tr.get(1) == '=' {
 				tr.push(LESS_THAN_EQUALS, tr.lex(0, 2))

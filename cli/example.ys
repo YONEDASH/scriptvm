@@ -8,5 +8,9 @@ fib := (i) {
     return fib(i-1) + fib(i-2)
 }
 
-result := fib(32)
+result := fib(10)
+
+list := [1, 2, 3]
+
+a := list[1]
 

@@ -130,6 +130,38 @@ func (f *CallExpr) String() string {
 
 func (f *CallExpr) expr() {}
 
+type SubscriptExpr struct {
+	Index Expr
+	Array Expr
+}
+
+func (s *SubscriptExpr) Tok() lexer.Token {
+	return s.Array.Tok()
+}
+
+func (s *SubscriptExpr) String() string {
+	return script.Stringify(s)
+}
+
+func (s *SubscriptExpr) expr() {}
+
+type ArrayExpr struct {
+	Elements []Expr
+}
+
+func (a *ArrayExpr) Tok() lexer.Token {
+	if len(a.Elements) == 0 {
+		return lexer.Token{Id: lexer.EOF, Pos: -1}
+	}
+	return a.Elements[0].Tok()
+}
+
+func (a *ArrayExpr) String() string {
+	return script.Stringify(a)
+}
+
+func (a *ArrayExpr) expr() {}
+
 //type ExprStmt struct {
 //	Caller Caller
 //}

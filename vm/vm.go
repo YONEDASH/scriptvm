@@ -100,8 +100,12 @@ func (v *VM) Execute(bc Bytecode) error {
 				return fmt.Errorf("cannot return without a frame")
 			}
 			p, index := v.global.Origin()
-			i = index - 1
 			v.global = p.Parent //return
+			i = index - 1
+		case ARR_CR:
+			v.arrayCreate()
+		case ARR_ID:
+			v.arrayIndex()
 		default:
 			return fmt.Errorf("unknown opcode %v in instruction %d", instr.Op, i)
 		}
@@ -218,14 +222,23 @@ func (v *VM) store(s string) {
 	v.global.Assign(string(s), v.stack.Pop())
 }
 
-//func (v *VM) call(arg Value) {
-//	if fn, ok := arg.(*Func); ok {
-//		argCount := v.stack.Pop().(Number)
-//
-//		for i := 0; i < len(fn.Params) && Number(i) < argCount; i++ {
-//			v.global.Declare(fn.Params[i], v.stack.Pop())
-//		}
-//	} else {
-//		panic("not a function")
-//	}
-//}
+func (v *VM) arrayCreate() {
+	size := v.stack.Pop().(int)
+	arr := make([]any, size)
+	for i := 0; i < size; i++ {
+		arr[i] = v.stack.Pop()
+	}
+	v.stack.Push(arr)
+}
+
+func (v *VM) arrayIndex() {
+	index := int(v.stack.Pop().(float64))
+	arr := v.stack.Pop().([]any)
+
+	if index < 0 || index > len(arr) {
+		v.stack.Push(nil)
+		return
+	}
+
+	v.stack.Push(arr[index])
+}

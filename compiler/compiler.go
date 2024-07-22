@@ -152,6 +152,14 @@ func compileExpr(bc *vm.Bytecode, expr ast.Expr) error {
 		if err := compileCallExpr(bc, e); err != nil {
 			return err
 		}
+	case *ast.SubscriptExpr:
+		if err := compileSubscriptExpr(bc, e); err != nil {
+			return err
+		}
+	case *ast.ArrayExpr:
+		if err := compileArrayExpr(bc, e); err != nil {
+			return err
+		}
 	default:
 		return ast.NewNodeError(expr, fmt.Sprintf("unknown expression type %T", expr))
 	}
@@ -222,6 +230,7 @@ func compileBinaryExpr(bc *vm.Bytecode, e *ast.BinaryExpr) error {
 		bc.SetArg(exitIndex, bc.Len())
 
 		return nil
+	default:
 	}
 
 	if err := compileExpr(bc, e.Left); err != nil {
@@ -322,5 +331,29 @@ func compileCallExpr(bc *vm.Bytecode, e *ast.CallExpr) error {
 
 	bc.Instruction(vm.ICALL, nil)
 
+	return nil
+}
+
+func compileArrayExpr(bc *vm.Bytecode, e *ast.ArrayExpr) error {
+	// Push argument expressions in reverse to be in order
+	for i := len(e.Elements) - 1; i >= 0; i-- {
+		if err := compileExpr(bc, e.Elements[i]); err != nil {
+			return err
+		}
+	}
+
+	bc.Instruction(vm.PUSH, len(e.Elements))
+	bc.Instruction(vm.ARR_CR, nil)
+	return nil
+}
+
+func compileSubscriptExpr(bc *vm.Bytecode, e *ast.SubscriptExpr) error {
+	if err := compileExpr(bc, e.Array); err != nil {
+		return err
+	}
+	if err := compileExpr(bc, e.Index); err != nil {
+		return err
+	}
+	bc.Instruction(vm.ARR_ID, nil)
 	return nil
 }

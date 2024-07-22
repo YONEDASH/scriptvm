@@ -55,6 +55,11 @@ const (
 	ICALL
 	// RET Return to index *after* function call.
 	RET
+
+	// ARR_CR Creates an array. Array size on top of stack followed by elements.
+	ARR_CR
+	// ARR_ID Indexes into an array. Value will be pushed on top of stack.
+	ARR_ID
 )
 
 type Bytecode []Instr

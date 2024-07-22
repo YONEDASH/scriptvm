@@ -190,7 +190,7 @@ func (p *parser) parseReturnStmt() (Stmt, error) {
 func (p *parser) parseDeclareStmt() (Stmt, error) {
 	ident, err := p.parseIdent()
 	if err != nil {
-		return nil, errors.Join(err, lexer.NewTokError(p.get(0), "expected identifier"))
+		return nil, errors.Join(err, lexer.NewTokError(p.get(-1), "expected identifier"))
 	}
 
 	if _, err = p.expect(lexer.COLON_EQUALS, "expected :="); err != nil {
@@ -519,34 +519,48 @@ func (p *parser) parseCall() (Expr, error) {
 		return nil, err
 	}
 
-	if p.get(0).Id == lexer.OPEN_PAREN {
-		p.consume()
+	for {
+		switch p.get(0).Id {
+		case lexer.OPEN_PAREN:
+			p.consume()
 
-		args := make([]Expr, 0)
+			args, err := p.parseCommaSeparatedExpr(lexer.CLOSE_PAREN)
 
-		for {
-			if p.done() || p.get(0).Id == lexer.CLOSE_PAREN {
-				break
-			}
-
-			arg, err := p.parseExpr()
 			if err != nil {
 				return nil, errors.Join(err, lexer.NewTokError(p.get(0), "in argument"))
 			}
-			args = append(args, arg)
+
+			if _, err := p.expect(lexer.CLOSE_PAREN, "close paren"); err != nil {
+				return nil, err
+			}
+
+			primary = &CallExpr{
+				Caller: primary,
+				Args:   args,
+			}
+		case lexer.OPEN_BRACKET:
+			p.consume()
+
+			index, err := p.parseExpr()
+
+			if err != nil {
+				return nil, errors.Join(err, lexer.NewTokError(p.get(0), "in index"))
+			}
+
+			if _, err := p.expect(lexer.CLOSE_BRACKET, "close bracket"); err != nil {
+				return nil, err
+			}
+
+			primary = &SubscriptExpr{
+				Array: primary,
+				Index: index,
+			}
+		default:
+			return primary, nil
 		}
 
-		if _, err := p.expect(lexer.CLOSE_PAREN, "close paren"); err != nil {
-			return nil, err
-		}
-
-		return &CallExpr{
-			Caller: primary,
-			Args:   args,
-		}, nil
 	}
 
-	return primary, nil
 }
 
 func (p *parser) parsePrimary() (Expr, error) {
@@ -563,35 +577,60 @@ func (p *parser) parsePrimary() (Expr, error) {
 	case lexer.NUMBER:
 		return p.parseNumber()
 	case lexer.OPEN_PAREN:
-		i := 0
-		for {
-			id := p.get(i).Id
-			if id == lexer.EOF || id == lexer.LF || id == lexer.CLOSE_PAREN {
-				break
-			}
-			i++
-		}
-		if p.get(i).Id == lexer.CLOSE_PAREN && p.get(i+1).Id == lexer.OPEN_BRACE {
-			idents, err := p.parseIdents()
-			if err == nil {
-				block, err := p.parseBlockStmt()
-				return &FunctionExpr{Params: idents, Body: block}, err
-			}
-		}
-
-		p.consume()
-		expr, err := p.parseExpr()
-		if err != nil {
-			return nil, err
-		}
-		if _, err = p.expect(lexer.CLOSE_PAREN, ")"); err != nil {
-			return nil, err
-		}
-		return expr, nil
+		return p.parsePriorityOrFunction()
+	case lexer.OPEN_BRACKET:
+		return p.parseArray()
 	default:
 		p.index++
 		return nil, lexer.NewTokError(tk, "expected primary expression")
 	}
+}
+
+func (p *parser) parseArray() (Expr, error) {
+	if _, err := p.expect(lexer.OPEN_BRACKET, "open bracket"); err != nil {
+		return nil, err
+	}
+
+	expressions, err := p.parseCommaSeparatedExpr(lexer.CLOSE_BRACKET)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := p.expect(lexer.CLOSE_BRACKET, "close bracket"); err != nil {
+		return nil, err
+	}
+
+	return &ArrayExpr{
+		Elements: expressions,
+	}, nil
+}
+
+func (p *parser) parsePriorityOrFunction() (Expr, error) {
+	i := 0
+	for {
+		id := p.get(i).Id
+		if id == lexer.EOF || id == lexer.LF || id == lexer.CLOSE_PAREN {
+			break
+		}
+		i++
+	}
+	if p.get(i).Id == lexer.CLOSE_PAREN && p.get(i+1).Id == lexer.OPEN_BRACE {
+		idents, err := p.parseIdents()
+		if err == nil {
+			block, err := p.parseBlockStmt()
+			return &FunctionExpr{Params: idents, Body: block}, err
+		}
+	}
+
+	p.consume()
+	expr, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+	if _, err = p.expect(lexer.CLOSE_PAREN, ")"); err != nil {
+		return nil, err
+	}
+	return expr, nil
 }
 
 func (p *parser) parseIdent() (*Identifier, error) {
