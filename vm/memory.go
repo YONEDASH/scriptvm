@@ -1,7 +1,5 @@
 package vm
 
-import "fmt"
-
 func newScope(parent *Scope) *Scope {
 	return &Scope{
 		Parent:   parent,
@@ -22,12 +20,10 @@ func (s *Scope) Assign(name string, v any) {
 		return
 	}
 	s.Declared[name] = v
-	fmt.Println("[SCOPE] ASSIGN", name, v)
 }
 
 func (s *Scope) Declare(name string, v any) {
 	s.Declared[name] = v
-	fmt.Println("[SCOPE] DECLARE", name, v)
 }
 
 func (s *Scope) Get(name string) any {

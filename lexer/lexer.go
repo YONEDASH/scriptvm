@@ -126,6 +126,10 @@ func Tokenize(input []byte) ([]Token, []error) {
 		case '/':
 			tr.push(SLASH, tr.lex(0, 1))
 		case '=':
+			if tr.get(1) == '=' {
+				tr.push(EQUALS_EQUALS, tr.lex(0, 2))
+				continue
+			}
 			tr.push(EQUALS, tr.lex(0, 1))
 		case ':':
 			if tr.get(1) == '=' {
@@ -141,6 +145,39 @@ func Tokenize(input []byte) ([]Token, []error) {
 			tr.push(OPEN_BRACE, tr.lex(0, 1))
 		case '}':
 			tr.push(CLOSE_BRACE, tr.lex(0, 1))
+		case '<':
+			if tr.get(1) == '=' {
+				tr.push(LESS_THAN_EQUALS, tr.lex(0, 2))
+				continue
+			}
+			tr.push(LESS_THAN, tr.lex(0, 1))
+		case '>':
+			if tr.get(1) == '=' {
+				tr.push(GREATER_THAN_EQUALS, tr.lex(0, 2))
+				continue
+			}
+			tr.push(GREATER_THAN, tr.lex(0, 1))
+		case '!':
+			if tr.get(1) == '=' {
+				tr.push(EXCLAMATION_EQUALS, tr.lex(0, 2))
+				continue
+			}
+			tr.push(EXCLAMATION, tr.lex(0, 2))
+		case '^':
+			tr.push(CIRCUMFLEX, tr.lex(0, 1))
+		case '&':
+			if tr.get(1) == '&' {
+				tr.push(AND_AND, tr.lex(0, 2))
+				continue
+			}
+			tr.push(AND, tr.lex(0, 1))
+		case '|':
+			if tr.get(1) == '|' {
+				tr.push(PIPE_PIPE, tr.lex(0, 2))
+				continue
+			}
+			tr.push(PIPE, tr.lex(0, 1))
+
 		default:
 			if unicode.IsLetter(r) || (tr.buffer.Len() > 0 && unicode.IsDigit(r)) {
 				tr.buffer.Append(r)

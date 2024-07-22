@@ -2,6 +2,7 @@ package vm
 
 import (
 	"fmt"
+	"log"
 	"script"
 )
 
@@ -30,6 +31,7 @@ func (v *VM) Dump() string {
 func (v *VM) Execute(bc Bytecode) error {
 	for i := 0; i < len(bc); i++ {
 		instr := bc[i]
+		fmt.Println(instr.Op, instr.Arg)
 		switch instr.Op {
 		case PUSH:
 			v.stack.Push(instr.Arg)
@@ -43,6 +45,12 @@ func (v *VM) Execute(bc Bytecode) error {
 			v.mul()
 		case DIV:
 			v.div()
+		case CMP, CMP_LT, CMP_GT, CMP_LTE, CMP_GTE:
+			v.cmp(instr.Op)
+		case NEG:
+			v.neg()
+		case NOT:
+			v.not()
 		case DECLARE:
 			v.declare(instr.Arg.(string))
 		case LOAD:
@@ -51,9 +59,12 @@ func (v *VM) Execute(bc Bytecode) error {
 			v.store(instr.Arg.(string))
 		case JUMP:
 			i = instr.Arg.(int) - 1
+		case JUMP_T:
+			if v.popBool() {
+				i = instr.Arg.(int) - 1
+			}
 		case JUMP_F:
-			value := v.stack.Pop()
-			if value == nil || value.(float64) == 0 {
+			if !v.popBool() {
 				i = instr.Arg.(int) - 1
 			}
 		case ENTER:
@@ -70,32 +81,102 @@ func (v *VM) Execute(bc Bytecode) error {
 		default:
 			return fmt.Errorf("unknown opcode %v in instruction %d", instr.Op, i)
 		}
+		fmt.Println(script.Stringify(v.stack))
 	}
 	return nil
 }
 
-func (v *VM) add() {
-	left := v.stack.Pop()
+func (v *VM) popBool() bool {
+	value := v.stack.Pop()
+
+	if value == nil {
+		return false
+	}
+
+	switch t := value.(type) {
+	case bool:
+		return t
+	case float64:
+		// TODO remove this once booleans are implemented later
+		return t != 0
+	default:
+		return true
+	}
+}
+
+func (v *VM) popBinary() (any, any) {
 	right := v.stack.Pop()
+	left := v.stack.Pop()
+	return left, right
+}
+
+func (v *VM) add() {
+	left, right := v.popBinary()
 	v.stack.Push(left.(float64) + right.(float64))
 }
 
 func (v *VM) sub() {
-	left := v.stack.Pop()
-	right := v.stack.Pop()
+	left, right := v.popBinary()
 	v.stack.Push(left.(float64) - right.(float64))
 }
 
 func (v *VM) mul() {
-	left := v.stack.Pop()
-	right := v.stack.Pop()
+	left, right := v.popBinary()
 	v.stack.Push(left.(float64) * right.(float64))
 }
 
 func (v *VM) div() {
-	left := v.stack.Pop()
-	right := v.stack.Pop()
+	left, right := v.popBinary()
 	v.stack.Push(left.(float64) / right.(float64))
+}
+
+func (v *VM) neg() {
+	float := v.stack.Pop().(float64)
+	v.stack.Push(-float)
+}
+
+func (v *VM) not() {
+	v.stack.Push(!v.popBool())
+}
+
+func (v *VM) cmp(code OpCode) {
+	left, right := v.popBinary()
+
+	if leftFloat, ok := left.(float64); ok {
+		if rightFloat, ok := right.(float64); ok {
+			switch code {
+			case CMP:
+				v.stack.Push(leftFloat == rightFloat)
+			case CMP_LT:
+				v.stack.Push(leftFloat < rightFloat)
+			case CMP_GT:
+				v.stack.Push(leftFloat > rightFloat)
+			case CMP_LTE:
+				v.stack.Push(leftFloat <= rightFloat)
+			case CMP_GTE:
+				v.stack.Push(leftFloat >= rightFloat)
+			default:
+				log.Fatalf("undefined comparison operation %v", code)
+			}
+			return
+		}
+		log.Fatalf("cannot compare number with non-number %v", code)
+	}
+
+	if leftBool, ok := left.(bool); ok {
+		if rightBool, ok := right.(bool); ok {
+			switch code {
+			case CMP:
+				v.stack.Push(leftBool == rightBool)
+			default:
+				log.Fatalf("undefined comparison operation %v", code)
+			}
+			return
+		}
+		log.Fatalf("cannot compare boolean with non-boolean %v", code)
+	}
+
+	log.Fatalf("cannot compare non-number with non-number %v", code)
 }
 
 func (v *VM) declare(s string) {

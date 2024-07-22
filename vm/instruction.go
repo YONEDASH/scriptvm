@@ -17,6 +17,18 @@ const (
 	MUL
 	DIV
 
+	// NEG Negates the top of the stack.
+	NEG
+
+	CMP
+	CMP_LT
+	CMP_GT
+	CMP_LTE
+	CMP_GTE
+
+	// NOT is equivalent to a logical NOT operation.
+	NOT
+
 	// DECLARE <name>
 	DECLARE
 	// STORE <name>
@@ -26,7 +38,9 @@ const (
 
 	// JUMP <index>
 	JUMP
-	// JUMP_F <index> Will jump to given index if the top of the stack is 0, nil or false.
+	// JUMP_T <index> Will jump to given index if the top of the stack is true.
+	JUMP_T
+	// JUMP_F <index> Will jump to given index if the top of the stack is  false.
 	JUMP_F
 
 	// ENTER and LEAVE are used to create/exit a scope.
@@ -53,6 +67,12 @@ func (bc *Bytecode) Len() int {
 
 func (bc *Bytecode) Instruction(op OpCode, arg any) {
 	bc.Append(Instr{Op: op, Arg: arg})
+}
+
+func (bc *Bytecode) SetArg(index int, arg any) {
+	d := *bc
+	d[index].Arg = arg
+	*bc = d
 }
 
 func (bc *Bytecode) String() string {

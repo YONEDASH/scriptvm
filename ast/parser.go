@@ -6,6 +6,8 @@ import (
 	"script/lexer"
 )
 
+// https://en.cppreference.com/w/cpp/language/operator_precedence
+
 func Parse(tokens []lexer.Token) (*Program, []error) {
 	p := &parser{tokens: tokens, errors: make([]error, 0)}
 
@@ -120,7 +122,7 @@ func (p *parser) parseStmt() (Stmt, error) {
 	case lexer.OPEN_BRACE:
 		return p.parseBlockStmt()
 	case lexer.IF:
-		return p.parseIfStmt()
+		return p.parseConditionalStmt()
 	default:
 	}
 
@@ -134,7 +136,7 @@ func (p *parser) parseStmt() (Stmt, error) {
 	}
 }
 
-func (p *parser) parseIfStmt() (Stmt, error) {
+func (p *parser) parseConditionalStmt() (Stmt, error) {
 	if _, err := p.expect(lexer.IF, "expected if"); err != nil {
 		return nil, err
 	}
@@ -234,7 +236,169 @@ func (p *parser) parseBlockStmt() (*BlockStmt, error) {
 }
 
 func (p *parser) parseExpr() (Expr, error) {
-	return p.parseBinaryExprAdditive()
+	return p.parseBinaryExprLogicalOr()
+}
+
+func (p *parser) parseBinaryExprLogicalOr() (Expr, error) {
+	left, err := p.parseBinaryExprLogicalAnd()
+	if err != nil {
+		return nil, err
+	}
+
+	for p.get(0).Id == lexer.PIPE_PIPE {
+		operator := p.consume()
+		var right Expr
+		if right, err = p.parseBinaryExprLogicalAnd(); err != nil {
+			return nil, err
+		}
+
+		left = &BinaryExpr{
+			Left:     left,
+			Operator: operator.Id,
+			Right:    right,
+		}
+	}
+
+	return left, nil
+}
+
+func (p *parser) parseBinaryExprLogicalAnd() (Expr, error) {
+	left, err := p.parseBinaryExprEquality()
+	if err != nil {
+		return nil, err
+	}
+
+	for p.get(0).Id == lexer.AND_AND {
+		operator := p.consume()
+		var right Expr
+		if right, err = p.parseBinaryExprEquality(); err != nil {
+			return nil, err
+		}
+
+		left = &BinaryExpr{
+			Left:     left,
+			Operator: operator.Id,
+			Right:    right,
+		}
+	}
+
+	return left, nil
+}
+
+//
+//func (p *parser) parseBinaryExprBitwiseOr() (Expr, error) {
+//	left, err := p.parseBinaryExprRelative()
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	for p.get(0).Id == lexer.EQUALS_EQUALS || p.get(0).Id == lexer.EXCLAMATION_EQUALS {
+//		operator := p.consume()
+//		var right Expr
+//		if right, err = p.parseBinaryExprRelative(); err != nil {
+//			return nil, err
+//		}
+//
+//		left = &BinaryExpr{
+//			Left:     left,
+//			Operator: operator.Id,
+//			Right:    right,
+//		}
+//	}
+//
+//	return left, nil
+//}
+//
+//func (p *parser) parseBinaryExprBitwiseXOR() (Expr, error) {
+//	left, err := p.parseBinaryExprRelative()
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	for p.get(0).Id == lexer.EQUALS_EQUALS || p.get(0).Id == lexer.EXCLAMATION_EQUALS {
+//		operator := p.consume()
+//		var right Expr
+//		if right, err = p.parseBinaryExprRelative(); err != nil {
+//			return nil, err
+//		}
+//
+//		left = &BinaryExpr{
+//			Left:     left,
+//			Operator: operator.Id,
+//			Right:    right,
+//		}
+//	}
+//
+//	return left, nil
+//}
+//
+//func (p *parser) parseBinaryExprBitwiseAnd() (Expr, error) {
+//	left, err := p.parseBinaryExprRelative()
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	for p.get(0).Id == lexer.EQUALS_EQUALS || p.get(0).Id == lexer.EXCLAMATION_EQUALS {
+//		operator := p.consume()
+//		var right Expr
+//		if right, err = p.parseBinaryExprRelative(); err != nil {
+//			return nil, err
+//		}
+//
+//		left = &BinaryExpr{
+//			Left:     left,
+//			Operator: operator.Id,
+//			Right:    right,
+//		}
+//	}
+//
+//	return left, nil
+//}
+
+func (p *parser) parseBinaryExprEquality() (Expr, error) {
+	left, err := p.parseBinaryExprRelative()
+	if err != nil {
+		return nil, err
+	}
+
+	for p.get(0).Id == lexer.EQUALS_EQUALS || p.get(0).Id == lexer.EXCLAMATION_EQUALS {
+		operator := p.consume()
+		var right Expr
+		if right, err = p.parseBinaryExprRelative(); err != nil {
+			return nil, err
+		}
+
+		left = &BinaryExpr{
+			Left:     left,
+			Operator: operator.Id,
+			Right:    right,
+		}
+	}
+
+	return left, nil
+}
+
+func (p *parser) parseBinaryExprRelative() (Expr, error) {
+	left, err := p.parseBinaryExprAdditive()
+	if err != nil {
+		return nil, err
+	}
+
+	for p.get(0).Id == lexer.LESS_THAN || p.get(0).Id == lexer.GREATER_THAN || p.get(0).Id == lexer.LESS_THAN_EQUALS || p.get(0).Id == lexer.GREATER_THAN_EQUALS {
+		operator := p.consume()
+		var right Expr
+		if right, err = p.parseBinaryExprAdditive(); err != nil {
+			return nil, err
+		}
+
+		left = &BinaryExpr{
+			Left:     left,
+			Operator: operator.Id,
+			Right:    right,
+		}
+	}
+
+	return left, nil
 }
 
 func (p *parser) parseBinaryExprAdditive() (Expr, error) {
@@ -261,7 +425,7 @@ func (p *parser) parseBinaryExprAdditive() (Expr, error) {
 }
 
 func (p *parser) parseBinaryExprMultiplicative() (Expr, error) {
-	left, err := p.parsePrimary()
+	left, err := p.parseUnary()
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +433,7 @@ func (p *parser) parseBinaryExprMultiplicative() (Expr, error) {
 	for p.get(0).Id == lexer.ASTERISK || p.get(0).Id == lexer.SLASH {
 		operator := p.consume()
 		var right Expr
-		if right, err = p.parsePrimary(); err != nil {
+		if right, err = p.parseUnary(); err != nil {
 			return nil, err
 		}
 
@@ -304,6 +468,20 @@ func (p *parser) parseBinaryExprMultiplicative() (Expr, error) {
 //
 //	return idents, nil
 //}
+
+func (p *parser) parseUnary() (Expr, error) {
+	switch p.get(0).Id {
+	case lexer.EXCLAMATION, lexer.MINUS, lexer.PLUS:
+		operator := p.consume()
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		return &UnaryExpr{Operator: operator.Id, Expr: expr}, nil
+	default:
+		return p.parsePrimary()
+	}
+}
 
 func (p *parser) parsePrimary() (Expr, error) {
 	tk := p.get(0)

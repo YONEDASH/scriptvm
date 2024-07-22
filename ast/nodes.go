@@ -85,6 +85,21 @@ func (b *BinaryExpr) String() string {
 
 func (b *BinaryExpr) expr() {}
 
+type UnaryExpr struct {
+	Operator lexer.TokenId
+	Expr     Expr
+}
+
+func (u *UnaryExpr) Tok() lexer.Token {
+	return u.Expr.Tok()
+}
+
+func (u *UnaryExpr) String() string {
+	return script.Stringify(u)
+}
+
+func (u *UnaryExpr) expr() {}
+
 type FunctionExpr struct {
 	Params []*Identifier
 	Body   *BlockStmt
