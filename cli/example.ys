@@ -11,3 +11,7 @@ if FALSE {
 } else {
     test = 69
 }
+
+function := () {
+    test = 1
+}

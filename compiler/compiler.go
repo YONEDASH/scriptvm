@@ -8,6 +8,12 @@ import (
 	"strconv"
 )
 
+type compiler struct {
+	bytecode *vm.Bytecode
+	// functions Stores the index of the function in the bytecode
+	functions map[string]int
+}
+
 func Compile(bytecode *vm.Bytecode, program *ast.Program) error {
 	for _, stmt := range program.Statements {
 		if err := compileStmt(bytecode, stmt); err != nil {
@@ -101,6 +107,10 @@ func compileExpr(bc *vm.Bytecode, expr ast.Expr) error {
 		}
 	case *ast.Identifier:
 		bc.Instruction(vm.LOAD, e.Symbol)
+	case *ast.FunctionExpr:
+		if err := compileFunctionExpr(bc, e); err != nil {
+			return err
+		}
 	default:
 		return ast.NewNodeError(expr, fmt.Sprintf("unknown expression type %T", expr))
 	}
@@ -223,6 +233,26 @@ func compileUnaryExpr(bc *vm.Bytecode, e *ast.UnaryExpr) error {
 	default:
 		return ast.NewNodeError(e, "unknown operator in unary expression")
 	}
+
+	return nil
+}
+
+func compileFunctionExpr(bc *vm.Bytecode, e *ast.FunctionExpr) error {
+	jumpIndex := bc.Len()
+	bc.Instruction(vm.JUMP, -1)
+
+	for _, param := range e.Params {
+		bc.Instruction(vm.DECLARE, param.Symbol)
+	}
+	if err := compileBlockStmt(bc, e.Body); err != nil {
+		return err
+	}
+
+	bc.Instruction(vm.RET, nil)
+	bc.SetArg(jumpIndex, bc.Len())
+
+	// Push index of function start (it is basically a pointer)
+	bc.Instruction(vm.PUSH, jumpIndex+1)
 
 	return nil
 }

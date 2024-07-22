@@ -461,27 +461,26 @@ func (p *parser) parseBinaryExprMultiplicative() (Expr, error) {
 	return left, nil
 }
 
-//
-//func (p *parser) parseIdents() ([]*Identifier, error) {
-//	if _, err := p.expect(lexer.OPEN_PAREN, "expected open paren for identifiers"); err != nil {
-//		return nil, err
-//	}
-//
-//	idents := make([]*Identifier, 0)
-//	for !p.done() && p.get(0).Id != lexer.CLOSE_PAREN {
-//		ident, err := p.parseIdent()
-//		if err != nil {
-//			return nil, errors.Join(err, lexer.NewTokError(p.get(0), "expected identifier"))
-//		}
-//		idents = append(idents, ident)
-//	}
-//
-//	if _, err := p.expect(lexer.CLOSE_PAREN, "expected close paren for identifiers"); err != nil {
-//		return nil, err
-//	}
-//
-//	return idents, nil
-//}
+func (p *parser) parseIdents() ([]*Identifier, error) {
+	if _, err := p.expect(lexer.OPEN_PAREN, "expected open paren for identifiers"); err != nil {
+		return nil, err
+	}
+
+	idents := make([]*Identifier, 0)
+	for !p.done() && p.get(0).Id != lexer.CLOSE_PAREN {
+		ident, err := p.parseIdent()
+		if err != nil {
+			return nil, errors.Join(err, lexer.NewTokError(p.get(0), "expected identifier"))
+		}
+		idents = append(idents, ident)
+	}
+
+	if _, err := p.expect(lexer.CLOSE_PAREN, "expected close paren for identifiers"); err != nil {
+		return nil, err
+	}
+
+	return idents, nil
+}
 
 func (p *parser) parseUnary() (Expr, error) {
 	switch p.get(0).Id {
@@ -495,6 +494,21 @@ func (p *parser) parseUnary() (Expr, error) {
 	default:
 		return p.parsePrimary()
 	}
+}
+
+func (p *parser) parseCall() (Expr, error) {
+	primary, err := p.parsePrimary()
+	if err != nil {
+		return nil, err
+	}
+
+	if p.get(1).Id == lexer.OPEN_PAREN {
+		//idents, err := p.parseIdents()
+
+		return &CallExpr{}
+	}
+
+	return primary, nil
 }
 
 func (p *parser) parsePrimary() (Expr, error) {
@@ -511,22 +525,22 @@ func (p *parser) parsePrimary() (Expr, error) {
 	case lexer.NUMBER:
 		return p.parseNumber()
 	case lexer.OPEN_PAREN:
-		//i := 0
-		//for {
-		//	id := p.get(i).Id
-		//	if id == lexer.EOF || id == lexer.LF || id == lexer.CLOSE_PAREN {
-		//		break
-		//	}
-		//	i++
-		//}
-		//if p.get(i).Id == lexer.CLOSE_PAREN && p.get(i+1).Id == lexer.OPEN_BRACE {
-		//	idents, err := p.parseIdents()
-		//	if err != nil {
-		//		return nil, err
-		//	}
-		//	block, err := p.parseBlockStmt()
-		//	return &FunctionExpr{Params: idents, Body: block}, err
-		//}
+		i := 0
+		for {
+			id := p.get(i).Id
+			if id == lexer.EOF || id == lexer.LF || id == lexer.CLOSE_PAREN {
+				break
+			}
+			i++
+		}
+		if p.get(i).Id == lexer.CLOSE_PAREN && p.get(i+1).Id == lexer.OPEN_BRACE {
+			idents, err := p.parseIdents()
+			if err != nil {
+				return nil, err
+			}
+			block, err := p.parseBlockStmt()
+			return &FunctionExpr{Params: idents, Body: block}, err
+		}
 
 		p.consume()
 		expr, err := p.parseExpr()

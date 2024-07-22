@@ -42,12 +42,16 @@ const (
 	JUMP_T
 	// JUMP_F <index> Will jump to given index if the top of the stack is  false.
 	JUMP_F
+	// JUMP_S Will jump to the index given on the top of the stack.
+	JUMP_S
 
 	// ENTER and LEAVE are used to create/exit a scope.
 	ENTER
 	LEAVE
 
 	CALL
+
+	// RET Returns to position on top of the callstack.
 	RET
 )
 

@@ -115,6 +115,21 @@ func (f *FunctionExpr) String() string {
 
 func (f *FunctionExpr) expr() {}
 
+type CallExpr struct {
+	Args []*Expr
+	Expr Expr
+}
+
+func (f *CallExpr) Tok() lexer.Token {
+	return f.Expr.Tok()
+}
+
+func (f *CallExpr) String() string {
+	return script.Stringify(f)
+}
+
+func (f *CallExpr) expr() {}
+
 //type ExprStmt struct {
 //	Expr Expr
 //}

@@ -59,6 +59,8 @@ func (v *VM) Execute(bc Bytecode) error {
 			v.store(instr.Arg.(string))
 		case JUMP:
 			i = instr.Arg.(int) - 1
+		case JUMP_S:
+			i = v.stack.Pop().(int) - 1
 		case JUMP_T:
 			if v.popBool() {
 				i = instr.Arg.(int) - 1

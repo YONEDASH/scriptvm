@@ -28,15 +28,16 @@ func _() {
 	_ = x[JUMP-17]
 	_ = x[JUMP_T-18]
 	_ = x[JUMP_F-19]
-	_ = x[ENTER-20]
-	_ = x[LEAVE-21]
-	_ = x[CALL-22]
-	_ = x[RET-23]
+	_ = x[JUMP_S-20]
+	_ = x[ENTER-21]
+	_ = x[LEAVE-22]
+	_ = x[CALL-23]
+	_ = x[RET-24]
 }
 
-const _OpCode_name = "INVALIDPUSHPOPADDSUBMULDIVNEGCMPCMP_LTCMP_GTCMP_LTECMP_GTENOTDECLARESTORELOADJUMPJUMP_TJUMP_FENTERLEAVECALLRET"
+const _OpCode_name = "INVALIDPUSHPOPADDSUBMULDIVNEGCMPCMP_LTCMP_GTCMP_LTECMP_GTENOTDECLARESTORELOADJUMPJUMP_TJUMP_FJUMP_SENTERLEAVECALLRET"
 
-var _OpCode_index = [...]uint8{0, 7, 11, 14, 17, 20, 23, 26, 29, 32, 38, 44, 51, 58, 61, 68, 73, 77, 81, 87, 93, 98, 103, 107, 110}
+var _OpCode_index = [...]uint8{0, 7, 11, 14, 17, 20, 23, 26, 29, 32, 38, 44, 51, 58, 61, 68, 73, 77, 81, 87, 93, 99, 104, 109, 113, 116}
 
 func (i OpCode) String() string {
 	if i >= OpCode(len(_OpCode_index)-1) {
