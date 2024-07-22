@@ -4,8 +4,10 @@ FALSE2 := 4 != 4
 
 test := 0
 
-if TRUE && TRUE && TRUE && TRUE {
-    if FALSE || FALSE || TRUE {
-        test = 10
-    }
+if FALSE {
+    test = 10
+} else if FALSE2 {
+    test = 42
+} else {
+    test = 69
 }

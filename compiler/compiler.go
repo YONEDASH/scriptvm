@@ -26,24 +26,34 @@ func compileStmt(bc *vm.Bytecode, stmt ast.Stmt) error {
 	case *ast.BlockStmt:
 		return compileBlockStmt(bc, s)
 	case *ast.ConditionalStmt:
-		return compileIfStmt(bc, s)
+		return compileConditionalStmt(bc, s)
 	default:
 		return ast.NewNodeError(stmt, fmt.Sprintf("unknown statement type %T", stmt))
 	}
 }
 
-func compileIfStmt(bc *vm.Bytecode, s *ast.ConditionalStmt) error {
+func compileConditionalStmt(bc *vm.Bytecode, s *ast.ConditionalStmt) error {
 	if err := compileExpr(bc, s.Cond); err != nil {
 		return err
 	}
 
-	jumpIndex := bc.Len()
+	jumpFalseIndex := bc.Len()
 	bc.Instruction(vm.JUMP_F, -1)
 	if err := compileBlockStmt(bc, s.Block); err != nil {
 		return err
 	}
 
-	bc.SetArg(jumpIndex, bc.Len())
+	if s.Else != nil {
+		jumpTrueIndex := bc.Len()
+		bc.Instruction(vm.JUMP, -1)
+
+		bc.SetArg(jumpFalseIndex, bc.Len())
+
+		if err := compileStmt(bc, s.Else); err != nil {
+			return err
+		}
+		bc.SetArg(jumpTrueIndex, bc.Len())
+	}
 
 	return nil
 }

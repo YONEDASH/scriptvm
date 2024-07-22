@@ -106,7 +106,7 @@ func (p *parser) expectLFB() error {
 		_, err := p.expect(lexer.LF, "LF")
 		return err
 	case lexer.CLOSE_BRACE:
-		_, err := p.expect(lexer.LF, "Close Brace")
+		_, err := p.expect(lexer.CLOSE_BRACE, "Close Brace")
 		return err
 	default:
 		_, err := p.expect(lexer.EOF, "LF, close brace or EOF")
@@ -150,10 +150,24 @@ func (p *parser) parseConditionalStmt() (Stmt, error) {
 		return nil, errors.Join(err, lexer.NewTokError(p.get(0), "if statement"))
 	}
 
+	var elseStmt Stmt
+	if p.get(0).Id == lexer.ELSE {
+		p.consume()
+		switch p.get(0).Id {
+		case lexer.IF:
+			elseStmt, err = p.parseConditionalStmt()
+		case lexer.OPEN_BRACE:
+			elseStmt, err = p.parseBlockStmt()
+		default:
+			return nil, lexer.NewTokError(p.get(0), "else statement expects if-statement or block")
+		}
+	}
+
 	return &ConditionalStmt{
 		Cond:  expr,
 		Block: block,
-	}, nil
+		Else:  elseStmt,
+	}, err
 }
 
 func (p *parser) parseDeclareStmt() (Stmt, error) {
