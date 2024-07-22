@@ -1,37 +1,48 @@
 package vm
 
-func newScope(parent *Scope) *Scope {
-	return &Scope{
+func newFrame(parent *Frame) *Frame {
+	return &Frame{
 		Parent:   parent,
 		Declared: make(map[string]any),
+		origin:   -1,
 	}
 }
 
-type Scope struct {
-	Parent   *Scope
+type Frame struct {
+	Parent   *Frame
 	Declared map[string]any
+	// origin is the index of the instruction which invoked the function.
+	origin int
 }
 
-func (s *Scope) Assign(name string, v any) {
-	if _, ok := s.Declared[name]; !ok {
-		if s.Parent != nil {
-			s.Parent.Assign(name, v)
+func (f *Frame) Origin() (*Frame, int) {
+	if f.Parent != nil && f.origin < 0 {
+		return f.Parent.Origin()
+	}
+
+	return f, f.origin
+}
+
+func (f *Frame) Assign(name string, v any) {
+	if _, ok := f.Declared[name]; !ok {
+		if f.Parent != nil {
+			f.Parent.Assign(name, v)
 		}
 		return
 	}
-	s.Declared[name] = v
+	f.Declared[name] = v
 }
 
-func (s *Scope) Declare(name string, v any) {
-	s.Declared[name] = v
+func (f *Frame) Declare(name string, v any) {
+	f.Declared[name] = v
 }
 
-func (s *Scope) Get(name string) any {
-	if data, ok := s.Declared[name]; ok {
+func (f *Frame) Get(name string) any {
+	if data, ok := f.Declared[name]; ok {
 		return data
 	}
-	if s.Parent != nil {
-		return s.Parent.Get(name)
+	if f.Parent != nil {
+		return f.Parent.Get(name)
 	}
 	return nil
 }

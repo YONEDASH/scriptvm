@@ -30,9 +30,11 @@ func compileStmt(bc *vm.Bytecode, stmt ast.Stmt) error {
 	case *ast.AssignStmt:
 		return compileAssignStmt(bc, s)
 	case *ast.BlockStmt:
-		return compileBlockStmt(bc, s)
+		return compileBlockStmt(bc, s, true)
 	case *ast.ConditionalStmt:
 		return compileConditionalStmt(bc, s)
+	case *ast.ReturnStmt:
+		return compileReturnStmt(bc, s)
 	default:
 		return ast.NewNodeError(stmt, fmt.Sprintf("unknown statement type %T", stmt))
 	}
@@ -44,14 +46,15 @@ func compileConditionalStmt(bc *vm.Bytecode, s *ast.ConditionalStmt) error {
 	}
 
 	jumpFalseIndex := bc.Len()
-	bc.Instruction(vm.JUMP_F, -1)
-	if err := compileBlockStmt(bc, s.Block); err != nil {
+	bc.Instruction(vm.JUMP_F, -100)
+
+	if err := compileBlockStmt(bc, s.Block, true); err != nil {
 		return err
 	}
 
 	if s.Else != nil {
 		jumpTrueIndex := bc.Len()
-		bc.Instruction(vm.JUMP, -1)
+		bc.Instruction(vm.JUMP, -200)
 
 		bc.SetArg(jumpFalseIndex, bc.Len())
 
@@ -59,6 +62,8 @@ func compileConditionalStmt(bc *vm.Bytecode, s *ast.ConditionalStmt) error {
 			return err
 		}
 		bc.SetArg(jumpTrueIndex, bc.Len())
+	} else {
+		bc.SetArg(jumpFalseIndex, bc.Len())
 	}
 
 	return nil
@@ -80,14 +85,46 @@ func compileAssignStmt(bc *vm.Bytecode, s *ast.AssignStmt) error {
 	return nil
 }
 
-func compileBlockStmt(bc *vm.Bytecode, s *ast.BlockStmt) error {
-	bc.Instruction(vm.ENTER, nil)
+func compileBlockStmt(bc *vm.Bytecode, s *ast.BlockStmt, scope bool) error {
+	if scope {
+		bc.Instruction(vm.ENTER, nil)
+	}
+
 	for _, stmt := range s.Statements {
 		if err := compileStmt(bc, stmt); err != nil {
 			return err
 		}
 	}
-	bc.Instruction(vm.LEAVE, nil)
+
+	if scope {
+		bc.Instruction(vm.LEAVE, nil)
+	}
+	return nil
+}
+
+func compileReturnStmt(bc *vm.Bytecode, s *ast.ReturnStmt) error {
+	//// Push return expressions in reverse
+	//for i := len(s.Returned) - 1; i >= 0; i-- {
+	//	if err := compileExpr(bc, s.Returned[i]); err != nil {
+	//		return err
+	//	}
+	//}
+	//
+	//// Push int with amount of arguments
+	//bc.Instruction(vm.PUSH, len(s.Returned))
+
+	// TODO Multiple return values
+	if len(s.Returned) > 0 {
+
+		if err := compileExpr(bc, s.Returned[0]); err != nil {
+			return err
+		}
+
+	} else {
+		bc.Instruction(vm.PUSH, nil)
+	}
+	bc.Instruction(vm.RET, nil)
+
 	return nil
 }
 
@@ -109,6 +146,10 @@ func compileExpr(bc *vm.Bytecode, expr ast.Expr) error {
 		bc.Instruction(vm.LOAD, e.Symbol)
 	case *ast.FunctionExpr:
 		if err := compileFunctionExpr(bc, e); err != nil {
+			return err
+		}
+	case *ast.CallExpr:
+		if err := compileCallExpr(bc, e); err != nil {
 			return err
 		}
 	default:
@@ -241,18 +282,45 @@ func compileFunctionExpr(bc *vm.Bytecode, e *ast.FunctionExpr) error {
 	jumpIndex := bc.Len()
 	bc.Instruction(vm.JUMP, -1)
 
+	bc.Instruction(vm.ENTER, nil)
+
 	for _, param := range e.Params {
 		bc.Instruction(vm.DECLARE, param.Symbol)
 	}
-	if err := compileBlockStmt(bc, e.Body); err != nil {
+
+	if err := compileBlockStmt(bc, e.Body, false); err != nil {
 		return err
 	}
 
-	bc.Instruction(vm.RET, nil)
+	bc.Instruction(vm.LEAVE, nil)
+
+	// TODO Will need to inject the return statement later. It IS required.
+	//bc.Instruction(vm.PUSH, 0) // Returning no values
+	//
+	//bc.Instruction(vm.PUSH, nil) // Return nil
+	//bc.Instruction(vm.RET, "NOTHING")
+
 	bc.SetArg(jumpIndex, bc.Len())
 
-	// Push index of function start (it is basically a pointer)
+	// Push index of function start. It is basically a pointer.
 	bc.Instruction(vm.PUSH, jumpIndex+1)
+
+	return nil
+}
+
+func compileCallExpr(bc *vm.Bytecode, e *ast.CallExpr) error {
+	// Push argument expressions in reverse to be declared in order in the call
+	for i := len(e.Args) - 1; i >= 0; i-- {
+		if err := compileExpr(bc, e.Args[i]); err != nil {
+			return err
+		}
+	}
+
+	if err := compileExpr(bc, e.Caller); err != nil {
+		return err
+	}
+
+	bc.Instruction(vm.ICALL, nil)
 
 	return nil
 }

@@ -177,7 +177,8 @@ func Tokenize(input []byte) ([]Token, []error) {
 				continue
 			}
 			tr.push(PIPE, tr.lex(0, 1))
-
+		case ',':
+			tr.push(COMMA, tr.lex(0, 1))
 		default:
 			if unicode.IsLetter(r) || (tr.buffer.Len() > 0 && unicode.IsDigit(r)) {
 				tr.buffer.Append(r)

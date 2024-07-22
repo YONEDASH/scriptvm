@@ -123,6 +123,8 @@ func (p *parser) parseStmt() (Stmt, error) {
 		return p.parseBlockStmt()
 	case lexer.IF:
 		return p.parseConditionalStmt()
+	case lexer.RETURN:
+		return p.parseReturnStmt()
 	default:
 	}
 
@@ -168,6 +170,21 @@ func (p *parser) parseConditionalStmt() (Stmt, error) {
 		Block: block,
 		Else:  elseStmt,
 	}, err
+}
+
+func (p *parser) parseReturnStmt() (Stmt, error) {
+	if _, err := p.expect(lexer.RETURN, "expected return"); err != nil {
+		return nil, err
+	}
+
+	expressions, err := p.parseCommaSeparatedExpr(lexer.LF)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ReturnStmt{
+		Returned: expressions,
+	}, nil
 }
 
 func (p *parser) parseDeclareStmt() (Stmt, error) {
@@ -300,7 +317,7 @@ func (p *parser) parseBinaryExprLogicalAnd() (Expr, error) {
 }
 
 //
-//func (p *parser) parseBinaryExprBitwiseOr() (Expr, error) {
+//func (p *parser) parseBinaryExprBitwiseOr() (Caller, error) {
 //	left, err := p.parseBinaryExprRelative()
 //	if err != nil {
 //		return nil, err
@@ -308,7 +325,7 @@ func (p *parser) parseBinaryExprLogicalAnd() (Expr, error) {
 //
 //	for p.get(0).Id == lexer.EQUALS_EQUALS || p.get(0).Id == lexer.EXCLAMATION_EQUALS {
 //		operator := p.consume()
-//		var right Expr
+//		var right Caller
 //		if right, err = p.parseBinaryExprRelative(); err != nil {
 //			return nil, err
 //		}
@@ -323,7 +340,7 @@ func (p *parser) parseBinaryExprLogicalAnd() (Expr, error) {
 //	return left, nil
 //}
 //
-//func (p *parser) parseBinaryExprBitwiseXOR() (Expr, error) {
+//func (p *parser) parseBinaryExprBitwiseXOR() (Caller, error) {
 //	left, err := p.parseBinaryExprRelative()
 //	if err != nil {
 //		return nil, err
@@ -331,7 +348,7 @@ func (p *parser) parseBinaryExprLogicalAnd() (Expr, error) {
 //
 //	for p.get(0).Id == lexer.EQUALS_EQUALS || p.get(0).Id == lexer.EXCLAMATION_EQUALS {
 //		operator := p.consume()
-//		var right Expr
+//		var right Caller
 //		if right, err = p.parseBinaryExprRelative(); err != nil {
 //			return nil, err
 //		}
@@ -346,7 +363,7 @@ func (p *parser) parseBinaryExprLogicalAnd() (Expr, error) {
 //	return left, nil
 //}
 //
-//func (p *parser) parseBinaryExprBitwiseAnd() (Expr, error) {
+//func (p *parser) parseBinaryExprBitwiseAnd() (Caller, error) {
 //	left, err := p.parseBinaryExprRelative()
 //	if err != nil {
 //		return nil, err
@@ -354,7 +371,7 @@ func (p *parser) parseBinaryExprLogicalAnd() (Expr, error) {
 //
 //	for p.get(0).Id == lexer.EQUALS_EQUALS || p.get(0).Id == lexer.EXCLAMATION_EQUALS {
 //		operator := p.consume()
-//		var right Expr
+//		var right Caller
 //		if right, err = p.parseBinaryExprRelative(); err != nil {
 //			return nil, err
 //		}
@@ -492,7 +509,7 @@ func (p *parser) parseUnary() (Expr, error) {
 		}
 		return &UnaryExpr{Operator: operator.Id, Expr: expr}, nil
 	default:
-		return p.parsePrimary()
+		return p.parseCall()
 	}
 }
 
@@ -502,10 +519,31 @@ func (p *parser) parseCall() (Expr, error) {
 		return nil, err
 	}
 
-	if p.get(1).Id == lexer.OPEN_PAREN {
-		//idents, err := p.parseIdents()
+	if p.get(0).Id == lexer.OPEN_PAREN {
+		p.consume()
 
-		return &CallExpr{}
+		args := make([]Expr, 0)
+
+		for {
+			if p.done() || p.get(0).Id == lexer.CLOSE_PAREN {
+				break
+			}
+
+			arg, err := p.parseExpr()
+			if err != nil {
+				return nil, errors.Join(err, lexer.NewTokError(p.get(0), "in argument"))
+			}
+			args = append(args, arg)
+		}
+
+		if _, err := p.expect(lexer.CLOSE_PAREN, "close paren"); err != nil {
+			return nil, err
+		}
+
+		return &CallExpr{
+			Caller: primary,
+			Args:   args,
+		}, nil
 	}
 
 	return primary, nil
@@ -535,11 +573,10 @@ func (p *parser) parsePrimary() (Expr, error) {
 		}
 		if p.get(i).Id == lexer.CLOSE_PAREN && p.get(i+1).Id == lexer.OPEN_BRACE {
 			idents, err := p.parseIdents()
-			if err != nil {
-				return nil, err
+			if err == nil {
+				block, err := p.parseBlockStmt()
+				return &FunctionExpr{Params: idents, Body: block}, err
 			}
-			block, err := p.parseBlockStmt()
-			return &FunctionExpr{Params: idents, Body: block}, err
 		}
 
 		p.consume()
@@ -571,4 +608,29 @@ func (p *parser) parseNumber() (*Number, error) {
 		return nil, err
 	}
 	return &Number{Value: t.Lexeme, tok: t}, nil
+}
+
+func (p *parser) parseCommaSeparatedExpr(end lexer.TokenId) ([]Expr, error) {
+	list := make([]Expr, 0)
+
+	for {
+		if p.done() || p.get(0).Id == end {
+			break
+		}
+
+		if len(list) > 0 {
+			if _, err := p.expect(lexer.COMMA, "expected comma"); err != nil {
+				return nil, err
+			}
+		}
+
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+
+		list = append(list, expr)
+	}
+
+	return list, nil
 }

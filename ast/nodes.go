@@ -116,12 +116,12 @@ func (f *FunctionExpr) String() string {
 func (f *FunctionExpr) expr() {}
 
 type CallExpr struct {
-	Args []*Expr
-	Expr Expr
+	Args   []Expr
+	Caller Expr
 }
 
 func (f *CallExpr) Tok() lexer.Token {
-	return f.Expr.Tok()
+	return f.Caller.Tok()
 }
 
 func (f *CallExpr) String() string {
@@ -131,11 +131,11 @@ func (f *CallExpr) String() string {
 func (f *CallExpr) expr() {}
 
 //type ExprStmt struct {
-//	Expr Expr
+//	Caller Caller
 //}
 //
 //func (e *ExprStmt) Tok() lexer.Token {
-//	return e.Expr.Tok()
+//	return e.Caller.Tok()
 //}
 //
 //func (e *ExprStmt) String() string {
@@ -206,3 +206,17 @@ func (i *ConditionalStmt) String() string {
 }
 
 func (i *ConditionalStmt) stmt() {}
+
+type ReturnStmt struct {
+	Returned []Expr
+}
+
+func (r *ReturnStmt) Tok() lexer.Token {
+	return r.Returned[0].Tok()
+}
+
+func (r *ReturnStmt) String() string {
+	return script.Stringify(r)
+}
+
+func (r *ReturnStmt) stmt() {}

@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"log"
 	"script"
+	"strings"
 )
 
 func New() *VM {
 	return &VM{
 		stack:  make(Stack, 0, 16),
-		global: newScope(nil),
+		global: newFrame(nil),
 	}
 }
 
 type VM struct {
-	global *Scope
+	global *Frame
 	stack  Stack
 }
 
@@ -28,10 +29,21 @@ func (v *VM) Dump() string {
 	return dump
 }
 
+const (
+	debugInstructions = false
+	debugStack        = false
+)
+
 func (v *VM) Execute(bc Bytecode) error {
 	for i := 0; i < len(bc); i++ {
 		instr := bc[i]
-		fmt.Println(instr.Op, instr.Arg)
+		if debugInstructions {
+			if instr.Arg != nil {
+				fmt.Println(instr.Op, instr.Arg)
+			} else {
+				fmt.Println(instr.Op)
+			}
+		}
 		switch instr.Op {
 		case PUSH:
 			v.stack.Push(instr.Arg)
@@ -70,20 +82,32 @@ func (v *VM) Execute(bc Bytecode) error {
 				i = instr.Arg.(int) - 1
 			}
 		case ENTER:
-			v.global = newScope(v.global)
+			v.global = newFrame(v.global)
 		case LEAVE:
 			if v.global.Parent == nil {
 				return fmt.Errorf("cannot leave global scope")
 			}
 			v.global = v.global.Parent
 		case CALL:
-			//v.call(instr.Arg)
+		//v.call(instr.Arg)
+		case ICALL:
+			f := newFrame(v.global)
+			f.origin = i + 1
+			v.global = f
+			i = v.stack.Pop().(int) - 1
 		case RET:
-			//return
+			if v.global.Parent == nil {
+				return fmt.Errorf("cannot return without a frame")
+			}
+			p, index := v.global.Origin()
+			i = index - 1
+			v.global = p.Parent //return
 		default:
 			return fmt.Errorf("unknown opcode %v in instruction %d", instr.Op, i)
 		}
-		fmt.Println(script.Stringify(v.stack))
+		if debugStack {
+			fmt.Println(strings.TrimSpace(strings.ReplaceAll(script.Stringify(v.stack), "\n", "")))
+		}
 	}
 	return nil
 }

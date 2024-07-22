@@ -31,6 +31,7 @@ const (
 	SLASH
 	EQUALS
 	COLON
+	COMMA
 
 	OPEN_PAREN
 	CLOSE_PAREN
@@ -57,9 +58,11 @@ const (
 
 	IF
 	ELSE
+	RETURN
 )
 
 var keywords = map[string]TokenId{
-	"if":   IF,
-	"else": ELSE,
+	"if":     IF,
+	"else":   ELSE,
+	"return": RETURN,
 }

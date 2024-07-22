@@ -49,9 +49,11 @@ const (
 	ENTER
 	LEAVE
 
+	// CALL Used to call an external function.
 	CALL
-
-	// RET Returns to position on top of the callstack.
+	// ICALL Used to call an internal function.
+	ICALL
+	// RET Return to index *after* function call.
 	RET
 )
 
