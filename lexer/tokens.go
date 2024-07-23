@@ -61,10 +61,18 @@ const (
 	IF
 	ELSE
 	RETURN
+	FOR
+	CONTINUE
+	BREAK
+	FN
 )
 
 var keywords = map[string]TokenId{
-	"if":     IF,
-	"else":   ELSE,
-	"return": RETURN,
+	"if":       IF,
+	"else":     ELSE,
+	"return":   RETURN,
+	"for":      FOR,
+	"continue": CONTINUE,
+	"break":    BREAK,
+	"fn":       FN,
 }

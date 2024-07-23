@@ -162,19 +162,20 @@ func (a *ArrayExpr) String() string {
 
 func (a *ArrayExpr) expr() {}
 
-//type ExprStmt struct {
-//	Caller Caller
-//}
-//
-//func (e *ExprStmt) Tok() lexer.Token {
-//	return e.Caller.Tok()
-//}
-//
-//func (e *ExprStmt) String() string {
-//	return script.Stringify(e)
-//}
-//
-//func (e *ExprStmt) stmt() {}
+type CastExpr struct {
+	To   Identifier
+	Expr Expr
+}
+
+func (a *CastExpr) Tok() lexer.Token {
+	return a.To.Tok()
+}
+
+func (a *CastExpr) String() string {
+	return script.Stringify(a)
+}
+
+func (a *CastExpr) expr() {}
 
 type DeclareStmt struct {
 	Ident *Identifier
@@ -268,3 +269,43 @@ func (r *ReturnStmt) String() string {
 }
 
 func (r *ReturnStmt) stmt() {}
+
+type LoopStmt struct {
+	Block *BlockStmt
+}
+
+func (l *LoopStmt) Tok() lexer.Token {
+	return l.Block.Tok()
+}
+
+func (l *LoopStmt) String() string {
+	return script.Stringify(l)
+}
+
+func (l *LoopStmt) stmt() {}
+
+type BreakStmt struct {
+	tok lexer.Token
+}
+
+func (b *BreakStmt) Tok() lexer.Token {
+	return b.tok
+}
+
+func (b *BreakStmt) String() string {
+	return script.Stringify(b)
+}
+
+func (b *BreakStmt) stmt() {}
+
+type ContinueStmt struct {
+	tok lexer.Token
+}
+
+func (c *ContinueStmt) Tok() lexer.Token {
+	return c.tok
+}
+
+func (c *ContinueStmt) String() string {
+	return script.Stringify(c)
+}

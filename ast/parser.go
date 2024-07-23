@@ -297,7 +297,37 @@ func (p *parser) parseBlockStmt() (*BlockStmt, error) {
 }
 
 func (p *parser) parseExpr() (Expr, error) {
-	return p.parseBinaryExprLogicalOr()
+	switch p.get(0).Id {
+	case lexer.FN:
+		return p.parseFunctionExpr()
+	default:
+		return p.parseBinaryExprLogicalOr()
+	}
+}
+
+func (p *parser) parseFunctionExpr() (Expr, error) {
+	if _, err := p.expect(lexer.FN, "fn"); err != nil {
+		return nil, err
+	}
+
+	if _, err := p.expect(lexer.OPEN_PAREN, "open paren in function"); err != nil {
+		return nil, err
+	}
+
+	idents, err := p.parseCommaSeparatedExpr(lexer.CLOSE_PAREN)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := p.parseBlockStmt()
+	if err != nil {
+		return nil, err
+	}
+
+	return &FunctionExpr{
+		Args:  idents,
+		Block: block,
+	}, nil
 }
 
 func (p *parser) parseBinaryExprLogicalOr() (Expr, error) {
@@ -538,6 +568,8 @@ func (p *parser) parseUnary() (Expr, error) {
 			return nil, err
 		}
 		return &UnaryExpr{Operator: operator.Id, Expr: expr}, nil
+	case lexer.OPEN_PAREN:
+
 	default:
 		return p.parseCall()
 	}
@@ -607,7 +639,7 @@ func (p *parser) parsePrimary() (Expr, error) {
 	case lexer.NUMBER:
 		return p.parseNumber()
 	case lexer.OPEN_PAREN:
-		return p.parsePriorityOrFunction()
+		return p.parsePrecedence()
 	case lexer.OPEN_BRACKET:
 		return p.parseArray()
 	default:
@@ -635,23 +667,7 @@ func (p *parser) parseArray() (Expr, error) {
 	}, nil
 }
 
-func (p *parser) parsePriorityOrFunction() (Expr, error) {
-	i := 0
-	for {
-		id := p.get(i).Id
-		if id == lexer.EOF || id == lexer.LF || id == lexer.CLOSE_PAREN {
-			break
-		}
-		i++
-	}
-	if p.get(i).Id == lexer.CLOSE_PAREN && p.get(i+1).Id == lexer.OPEN_BRACE {
-		idents, err := p.parseIdents()
-		if err == nil {
-			block, err := p.parseBlockStmt()
-			return &FunctionExpr{Params: idents, Body: block}, err
-		}
-	}
-
+func (p *parser) parsePrecedence() (Expr, error) {
 	p.consume()
 	expr, err := p.parseExpr()
 	if err != nil {
@@ -694,6 +710,31 @@ func (p *parser) parseCommaSeparatedExpr(end lexer.TokenId) ([]Expr, error) {
 		}
 
 		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+
+		list = append(list, expr)
+	}
+
+	return list, nil
+}
+
+func (p *parser) parseCommaSeparatedIdent(end lexer.TokenId) ([]*Identifier, error) {
+	list := make([]*Identifier, 0)
+
+	for {
+		if p.done() || p.get(0).Id == end {
+			break
+		}
+
+		if len(list) > 0 {
+			if _, err := p.expect(lexer.COMMA, "expected comma"); err != nil {
+				return nil, err
+			}
+		}
+
+		expr, err := p.parseIdent()
 		if err != nil {
 			return nil, err
 		}
