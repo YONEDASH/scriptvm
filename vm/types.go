@@ -1,8 +1,36 @@
 package vm
 
-type Func struct {
-	Params []string
-	Body   []Instr
+type TypeId uint8
+
+const (
+	Invalid TypeId = iota
+	Int
+	Float
+	Bool
+	Function
+	Array
+)
+
+func TypeOf(v any) TypeId {
+	switch v.(type) {
+	case int:
+		return Int
+	case float64:
+		return Float
+	case Func:
+		return Function
+	case []any:
+		return Array
+	default:
+		return Invalid
+	}
 }
 
-func (f Func) value() {}
+type Type struct {
+	Id TypeId
+}
+
+type Func struct {
+	//Params []string
+	Address int
+}

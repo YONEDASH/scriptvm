@@ -49,19 +49,22 @@ const (
 	ENTER
 	LEAVE
 
-	// CALL Used to call an external function.
+	// ECALL Used to call an external function.
+	ECALL
+	// CALL Used to call an internal function.
 	CALL
-	// ICALL Used to call an internal function.
-	ICALL
 	// RET Return to index *after* function call.
 	RET
 
 	// ARR_CR Creates an array. Array size on top of stack followed by elements.
 	ARR_CR
-	// ARR_ID Indexes into an array. Value will be pushed on top of stack.
+	// ARR_ID Indexes into an array. TypeId will be pushed on top of stack.
 	ARR_ID
-	// ARR_V Sets an array element. Value on top of stack followed by index.
+	// ARR_V Sets an array element. TypeId on top of stack followed by index.
 	ARR_V
+
+	// CAST <type> <value>
+	CAST
 )
 
 type Bytecode []Instr

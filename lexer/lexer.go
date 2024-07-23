@@ -166,7 +166,7 @@ func Tokenize(input []byte) ([]Token, []error) {
 				tr.push(EXCLAMATION_EQUALS, tr.lex(0, 2))
 				continue
 			}
-			tr.push(EXCLAMATION, tr.lex(0, 2))
+			tr.push(EXCLAMATION, tr.lex(0, 1))
 		case '^':
 			tr.push(CIRCUMFLEX, tr.lex(0, 1))
 		case '&':

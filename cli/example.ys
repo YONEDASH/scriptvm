@@ -1,25 +1,3 @@
-fib := (i) {
-    if i == 0 {
-        return 0
-    }
-    if i <= 2 {
-        return 1
-    }
-    return fib(i-1) + fib(i-2)
-}
-
-result := fib(10)
-
-
-list := [1, 2, 3]
-a := list[-1]
-b := [1,2,3][0]
-
-list[0] = 10
-
-listOfList := [[1,2,3],[4,5,6]]
-
-listOfList[0][2] = 999
-listOfList[1][2] = -999
-
-listOfList[-1] = [7,8,9]
+f := 10/3
+i := int(f)
+b := !bool(i)

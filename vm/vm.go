@@ -8,10 +8,16 @@ import (
 )
 
 func New() *VM {
-	return &VM{
+	vm := &VM{
 		stack:  make(Stack, 0, 16),
 		global: newFrame(nil),
 	}
+
+	vm.global.Declare("int", Type{Int})
+	vm.global.Declare("float", Type{Float})
+	vm.global.Declare("bool", Type{Bool})
+
+	return vm
 }
 
 type VM struct {
@@ -19,12 +25,12 @@ type VM struct {
 	stack  Stack
 }
 
-func (v *VM) Dump() string {
+func (vm *VM) Dump() string {
 	dump := "## STACK ##\n"
-	dump += script.Stringify(v.stack) + "\n"
+	dump += script.Stringify(vm.stack) + "\n"
 
 	dump += "## GLOBAL ##\n"
-	dump += script.Stringify(v.global) + "\n"
+	dump += script.Stringify(vm.global) + "\n"
 
 	return dump
 }
@@ -34,9 +40,9 @@ const (
 	debugStack        = false
 )
 
-func (v *VM) Execute(bc Bytecode) error {
+func (vm *VM) Execute(bc Bytecode) error {
 	if debugStack {
-		fmt.Println(strings.TrimSpace(strings.ReplaceAll(script.Stringify(v.stack), "\n", "")))
+		fmt.Println(strings.TrimSpace(strings.ReplaceAll(script.Stringify(vm.stack), "\n", "")))
 	}
 
 	for i := 0; i < len(bc); i++ {
@@ -50,80 +56,86 @@ func (v *VM) Execute(bc Bytecode) error {
 		}
 		switch instr.Op {
 		case PUSH:
-			v.stack.Push(instr.Arg)
+			vm.stack.Push(instr.Arg)
 		case POP:
-			v.stack.Pop()
+			vm.stack.Pop()
 		case ADD:
-			v.add()
+			vm.add()
 		case SUB:
-			v.sub()
+			vm.sub()
 		case MUL:
-			v.mul()
+			vm.mul()
 		case DIV:
-			v.div()
+			vm.div()
 		case CMP, CMP_LT, CMP_GT, CMP_LTE, CMP_GTE:
-			v.cmp(instr.Op)
+			vm.cmp(instr.Op)
 		case NEG:
-			v.neg()
+			vm.neg()
 		case NOT:
-			v.not()
+			vm.not()
 		case DECLARE:
-			v.declare(instr.Arg.(string))
+			vm.declare(instr.Arg.(string))
 		case LOAD:
-			v.load(instr.Arg.(string))
+			vm.load(instr.Arg.(string))
 		case STORE:
-			v.store(instr.Arg.(string))
+			vm.store(instr.Arg.(string))
 		case JUMP:
 			i = instr.Arg.(int) - 1
 		case JUMP_S:
-			i = v.stack.Pop().(int) - 1
+			i = vm.stack.Pop().(int) - 1
 		case JUMP_T:
-			if v.popBool() {
+			if vm.popBool() {
 				i = instr.Arg.(int) - 1
 			}
 		case JUMP_F:
-			if !v.popBool() {
+			if !vm.popBool() {
 				i = instr.Arg.(int) - 1
 			}
 		case ENTER:
-			v.global = newFrame(v.global)
+			vm.global = newFrame(vm.global)
 		case LEAVE:
-			if v.global.Parent == nil {
+			if vm.global.Parent == nil {
 				return fmt.Errorf("cannot leave global scope")
 			}
-			v.global = v.global.Parent
+			vm.global = vm.global.Parent
+		case ECALL:
+		//vm.call(instr.Arg)
 		case CALL:
-		//v.call(instr.Arg)
-		case ICALL:
-			f := newFrame(v.global)
-			f.origin = i + 1
-			v.global = f
-			i = v.stack.Pop().(int) - 1
+			vm.call(&i)
 		case RET:
-			if v.global.Parent == nil {
-				return fmt.Errorf("cannot return without a frame")
+			var err error
+			i, err = vm.ret(i)
+			if err != nil {
+				return err
 			}
-			p, index := v.global.Origin()
-			v.global = p.Parent //return
-			i = index - 1
 		case ARR_CR:
-			v.arrayCreate()
+			vm.arrayCreate()
 		case ARR_ID:
-			v.arrayIndex()
+			vm.arrayIndex()
 		case ARR_V:
-			v.arraySet()
+			vm.arraySet()
 		default:
-			return fmt.Errorf("unknown opcode %v in instruction %d", instr.Op, i)
+			return fmt.Errorf("unknown opcode %vm in instruction %d", instr.Op, i)
 		}
 		if debugStack {
-			fmt.Println(strings.TrimSpace(strings.ReplaceAll(script.Stringify(v.stack), "\n", "")))
+			fmt.Println(strings.TrimSpace(strings.ReplaceAll(script.Stringify(vm.stack), "\n", "")))
 		}
 	}
 	return nil
 }
 
-func (v *VM) popBool() bool {
-	value := v.stack.Pop()
+func (vm *VM) ret(i int) (int, error) {
+	if vm.global.Parent == nil {
+		return 0, fmt.Errorf("cannot return without a frame")
+	}
+	p, index := vm.global.Origin()
+	vm.global = p.Parent //return
+	i = index - 1
+	return i, nil
+}
+
+func (vm *VM) popBool() bool {
+	value := vm.stack.Pop()
 
 	if value == nil {
 		return false
@@ -140,131 +152,204 @@ func (v *VM) popBool() bool {
 	}
 }
 
-func (v *VM) popBinary() (any, any) {
-	right := v.stack.Pop()
-	left := v.stack.Pop()
+func (vm *VM) popBinary() (any, any) {
+	right := vm.stack.Pop()
+	left := vm.stack.Pop()
 	return left, right
 }
 
-func (v *VM) add() {
-	left, right := v.popBinary()
-	v.stack.Push(left.(float64) + right.(float64))
+func (vm *VM) add() {
+	left, right := vm.popBinary()
+	vm.stack.Push(left.(float64) + right.(float64))
 }
 
-func (v *VM) sub() {
-	left, right := v.popBinary()
-	v.stack.Push(left.(float64) - right.(float64))
+func (vm *VM) sub() {
+	left, right := vm.popBinary()
+	vm.stack.Push(left.(float64) - right.(float64))
 }
 
-func (v *VM) mul() {
-	left, right := v.popBinary()
-	v.stack.Push(left.(float64) * right.(float64))
+func (vm *VM) mul() {
+	left, right := vm.popBinary()
+	vm.stack.Push(left.(float64) * right.(float64))
 }
 
-func (v *VM) div() {
-	left, right := v.popBinary()
-	v.stack.Push(left.(float64) / right.(float64))
+func (vm *VM) div() {
+	left, right := vm.popBinary()
+	vm.stack.Push(left.(float64) / right.(float64))
 }
 
-func (v *VM) neg() {
-	float := v.stack.Pop().(float64)
-	v.stack.Push(-float)
+func (vm *VM) neg() {
+	float := vm.stack.Pop().(float64)
+	vm.stack.Push(-float)
 }
 
-func (v *VM) not() {
-	v.stack.Push(!v.popBool())
+func (vm *VM) not() {
+	vm.stack.Push(!vm.popBool())
 }
 
-func (v *VM) cmp(code OpCode) {
-	left, right := v.popBinary()
+func (vm *VM) cmp(code OpCode) {
+	left, right := vm.popBinary()
 
 	if leftFloat, ok := left.(float64); ok {
 		if rightFloat, ok := right.(float64); ok {
 			switch code {
 			case CMP:
-				v.stack.Push(leftFloat == rightFloat)
+				vm.stack.Push(leftFloat == rightFloat)
 			case CMP_LT:
-				v.stack.Push(leftFloat < rightFloat)
+				vm.stack.Push(leftFloat < rightFloat)
 			case CMP_GT:
-				v.stack.Push(leftFloat > rightFloat)
+				vm.stack.Push(leftFloat > rightFloat)
 			case CMP_LTE:
-				v.stack.Push(leftFloat <= rightFloat)
+				vm.stack.Push(leftFloat <= rightFloat)
 			case CMP_GTE:
-				v.stack.Push(leftFloat >= rightFloat)
+				vm.stack.Push(leftFloat >= rightFloat)
 			default:
-				log.Fatalf("undefined comparison operation %v", code)
+				log.Fatalf("undefined comparison operation %vm", code)
 			}
 			return
 		}
-		log.Fatalf("cannot compare number with non-number %v", code)
+		log.Fatalf("cannot compare number with non-number %vm", code)
 	}
 
 	if leftBool, ok := left.(bool); ok {
 		if rightBool, ok := right.(bool); ok {
 			switch code {
 			case CMP:
-				v.stack.Push(leftBool == rightBool)
+				vm.stack.Push(leftBool == rightBool)
 			default:
-				log.Fatalf("undefined comparison operation %v", code)
+				log.Fatalf("undefined comparison operation %vm", code)
 			}
 			return
 		}
-		log.Fatalf("cannot compare boolean with non-boolean %v", code)
+		log.Fatalf("cannot compare boolean with non-boolean %vm", code)
 	}
 
-	log.Fatalf("cannot compare non-number with non-number %v", code)
+	log.Fatalf("cannot compare non-number with non-number %vm", code)
 }
 
-func (v *VM) declare(s string) {
-	v.global.Declare(string(s), v.stack.Pop())
+func (vm *VM) declare(s string) {
+	vm.global.Declare(string(s), vm.stack.Pop())
 }
 
-func (v *VM) load(key string) {
-	val := v.global.Get(string(key))
-	v.stack.Push(val)
+func (vm *VM) load(key string) {
+	val := vm.global.Get(string(key))
+	vm.stack.Push(val)
 }
 
-func (v *VM) store(s string) {
-	v.global.Assign(string(s), v.stack.Pop())
+func (vm *VM) store(s string) {
+	vm.global.Assign(string(s), vm.stack.Pop())
 }
 
-func (v *VM) arrayCreate() {
-	size := v.stack.Pop().(int)
+func (vm *VM) arrayCreate() {
+	size := vm.stack.Pop().(int)
 	arr := make([]any, size)
 	for i := 0; i < size; i++ {
-		arr[i] = v.stack.Pop()
+		arr[i] = vm.stack.Pop()
 	}
-	v.stack.Push(arr)
+	vm.stack.Push(arr)
 }
 
-func (v *VM) arrayIndex() {
-	index := int(v.stack.Pop().(float64))
-	arr := v.stack.Pop().([]any)
+func (vm *VM) arrayIndex() {
+	index := int(vm.stack.Pop().(float64))
+	arr := vm.stack.Pop().([]any)
 
 	if index < 0 {
 		index = len(arr) + index
 	}
 
 	if index < 0 || index >= len(arr) {
-		v.stack.Push(nil)
+		vm.stack.Push(nil)
 		return
 	}
 
-	v.stack.Push(arr[index])
+	vm.stack.Push(arr[index])
 }
 
-func (v *VM) arraySet() {
-	index := int(v.stack.Pop().(float64))
-	arr := v.stack.Pop().([]any)
+func (vm *VM) arraySet() {
+	index := int(vm.stack.Pop().(float64))
+	arr := vm.stack.Pop().([]any)
 
 	if index < 0 {
 		index = len(arr) + index
 	}
 
 	if index < 0 || index >= len(arr) {
-		//v.stack.Push(nil)
+		//vm.stack.Push(nil)
 		return
 	}
 
-	arr[index] = v.stack.Pop()
+	arr[index] = vm.stack.Pop()
+}
+
+func (vm *VM) call(i *int) {
+	top := vm.stack.Pop()
+
+	address := -1
+
+	switch t := top.(type) {
+	case Func:
+		address = t.Address
+	case Type:
+		vm.cast(t)
+		return
+	default:
+		log.Fatalf("cannot call non-function %v", top)
+		return
+	}
+
+	f := newFrame(vm.global)
+	f.origin = *i + 1
+	vm.global = f
+	*i = address
+}
+
+func (vm *VM) cast(t Type) {
+	v := vm.stack.Pop()
+	vt := TypeOf(v)
+
+	switch t.Id {
+	case Int:
+		switch vt {
+		case Int:
+			vm.stack.Push(v)
+		case Float:
+			vm.stack.Push(int(v.(float64)))
+		case Bool:
+			if v.(bool) {
+				vm.stack.Push(int(1))
+			} else {
+				vm.stack.Push(int(0))
+			}
+		default:
+			log.Fatalf("cannot cast to int from %v", vt)
+		}
+	case Float:
+		switch vt {
+		case Int:
+			vm.stack.Push(float64(v.(int)))
+		case Float:
+			vm.stack.Push(v)
+		case Bool:
+			if v.(bool) {
+				vm.stack.Push(float64(1))
+			} else {
+				vm.stack.Push(float64(0))
+			}
+		default:
+			log.Fatalf("cannot cast to float from %v", vt)
+		}
+	case Bool:
+		switch vt {
+		case Int:
+			vm.stack.Push(v.(int) != 0)
+		case Float:
+			vm.stack.Push(v.(float64) != 0)
+		case Bool:
+			vm.stack.Push(v)
+		default:
+			log.Fatalf("cannot cast to bool from %v", vt)
+		}
+	default:
+		log.Fatalf("cannot cast to unknown type %vm", t)
+	}
 }

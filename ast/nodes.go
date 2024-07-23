@@ -163,7 +163,7 @@ func (a *ArrayExpr) String() string {
 func (a *ArrayExpr) expr() {}
 
 type CastExpr struct {
-	To   Identifier
+	To   *Identifier
 	Expr Expr
 }
 

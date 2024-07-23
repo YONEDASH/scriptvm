@@ -328,7 +328,12 @@ func compileFunctionExpr(bc *vm.Bytecode, e *ast.FunctionExpr) error {
 	bc.SetArg(jumpIndex, bc.Len())
 
 	// Push index of function start. It is basically a pointer.
-	bc.Instruction(vm.PUSH, jumpIndex+1)
+
+	function := vm.Func{
+		Address: jumpIndex + 1,
+	}
+
+	bc.Instruction(vm.PUSH, function)
 
 	return nil
 }
@@ -345,7 +350,7 @@ func compileCallExpr(bc *vm.Bytecode, e *ast.CallExpr) error {
 		return err
 	}
 
-	bc.Instruction(vm.ICALL, nil)
+	bc.Instruction(vm.CALL, nil)
 
 	return nil
 }
