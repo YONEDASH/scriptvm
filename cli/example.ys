@@ -1,3 +1,9 @@
 f := 10/3
 i := int(f)
 b := !bool(i)
+
+calc := fn(a,b,c) {
+    return int(a) + int(b) + int(c)
+}
+
+result := calc(f,i,b)

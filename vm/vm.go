@@ -160,27 +160,46 @@ func (vm *VM) popBinary() (any, any) {
 
 func (vm *VM) add() {
 	left, right := vm.popBinary()
-	vm.stack.Push(left.(float64) + right.(float64))
+	if v, err := Add(left, right); err != nil {
+		vm.stack.Push(nil)
+	} else {
+		vm.stack.Push(v)
+	}
 }
 
 func (vm *VM) sub() {
 	left, right := vm.popBinary()
-	vm.stack.Push(left.(float64) - right.(float64))
+	if v, err := Sub(left, right); err != nil {
+		vm.stack.Push(nil)
+	} else {
+		vm.stack.Push(v)
+	}
 }
 
 func (vm *VM) mul() {
 	left, right := vm.popBinary()
-	vm.stack.Push(left.(float64) * right.(float64))
+	if v, err := Mul(left, right); err != nil {
+		vm.stack.Push(nil)
+	} else {
+		vm.stack.Push(v)
+	}
 }
 
 func (vm *VM) div() {
 	left, right := vm.popBinary()
-	vm.stack.Push(left.(float64) / right.(float64))
+	if v, err := Div(left, right); err != nil {
+		vm.stack.Push(nil)
+	} else {
+		vm.stack.Push(v)
+	}
 }
 
 func (vm *VM) neg() {
-	float := vm.stack.Pop().(float64)
-	vm.stack.Push(-float)
+	if v, err := Neg(vm.stack.Pop()); err != nil {
+		vm.stack.Push(nil)
+	} else {
+		vm.stack.Push(v)
+	}
 }
 
 func (vm *VM) not() {

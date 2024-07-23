@@ -300,8 +300,6 @@ func (p *parser) parseExpr() (Expr, error) {
 	switch p.get(0).Id {
 	case lexer.FN:
 		return p.parseFunctionExpr()
-	case lexer.CAST:
-		return p.parseCastExpr()
 	default:
 		return p.parseBinaryExprLogicalOr()
 	}
@@ -334,40 +332,6 @@ func (p *parser) parseFunctionExpr() (Expr, error) {
 		Params: idents,
 		Body:   block,
 	}, nil
-}
-
-func (p *parser) parseCastExpr() (Expr, error) {
-	if _, err := p.expect(lexer.CAST, "cast"); err != nil {
-		return nil, err
-	}
-
-	if _, err := p.expect(lexer.OPEN_PAREN, "open paren in cast"); err != nil {
-		return nil, err
-	}
-
-	expr, err := p.parseExpr()
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := p.expect(lexer.COMMA, "comma in cast"); err != nil {
-		return nil, err
-	}
-
-	ident, err := p.parseIdent()
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := p.expect(lexer.CLOSE_PAREN, "close paren in cast"); err != nil {
-		return nil, err
-	}
-
-	return &CastExpr{
-		To:   ident,
-		Expr: expr,
-	}, nil
-
 }
 
 func (p *parser) parseBinaryExprLogicalOr() (Expr, error) {

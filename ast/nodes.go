@@ -162,21 +162,6 @@ func (a *ArrayExpr) String() string {
 
 func (a *ArrayExpr) expr() {}
 
-type CastExpr struct {
-	To   *Identifier
-	Expr Expr
-}
-
-func (a *CastExpr) Tok() lexer.Token {
-	return a.To.Tok()
-}
-
-func (a *CastExpr) String() string {
-	return script.Stringify(a)
-}
-
-func (a *CastExpr) expr() {}
-
 type DeclareStmt struct {
 	Ident *Identifier
 	Expr  Expr

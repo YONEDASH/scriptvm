@@ -65,7 +65,6 @@ const (
 	CONTINUE
 	BREAK
 	FN
-	CAST
 )
 
 var keywords = map[string]TokenId{
@@ -76,5 +75,4 @@ var keywords = map[string]TokenId{
 	"continue": CONTINUE,
 	"break":    BREAK,
 	"fn":       FN,
-	"cast":     CAST,
 }
