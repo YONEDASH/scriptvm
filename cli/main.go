@@ -14,8 +14,10 @@ import (
 //go:embed example.ys
 var example string
 
+const debug = true
+
 func main() {
-	fmt.Println("### Script ###")
+	//fmt.Println("### Script ###")
 	//reader := bufio.NewReader(os.Stdin)
 
 	v := vm.New()
@@ -32,7 +34,9 @@ func main() {
 		fmt.Printf("error: %+v\n", errs)
 		os.Exit(1)
 	}
-	fmt.Println("tokens:", tokens)
+	if debug {
+		fmt.Println("tokens:", tokens)
+	}
 
 	p, errs := ast.Parse(tokens)
 	if len(errs) > 0 {
@@ -40,8 +44,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println(p)
-	fmt.Println("### BYTECODE ###")
+	if debug {
+		fmt.Println(p)
+		fmt.Println("### BYTECODE ###")
+	}
 
 	bytecode := make(vm.Bytecode, 0)
 	err := compiler.Compile(&bytecode, p)
@@ -50,23 +56,28 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println(bytecode.String())
+	if debug {
+		fmt.Println(bytecode.String())
 
-	file, err := os.Create("dump.yasm")
-	if err != nil {
-		log.Fatal(err)
+		file, err := os.Create("dump.yasm")
+		if err != nil {
+			log.Fatal(err)
+		}
+		file.WriteString(bytecode.String())
+		file.Close()
+
+		fmt.Println("### VM ###")
 	}
-	file.WriteString(bytecode.String())
-	file.Close()
 
-	fmt.Println("### VM ###")
 	err = v.Execute(bytecode)
 	if err != nil {
 		fmt.Printf("error: %+v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println(v.Dump())
+	if debug {
+		fmt.Println(v.Dump())
+	}
 
 	//}
 }

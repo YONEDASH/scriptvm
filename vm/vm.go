@@ -118,6 +118,10 @@ func (vm *VM) Execute(bc Bytecode) error {
 			vm.arraySet()
 		case FRAME:
 			vm.frame(i, instr.Arg.(int))
+		case ANCHOR:
+			vm.cframe.anchor = true
+		case RESCUE:
+			vm.cframe = vm.cframe.Anchor()
 		case JUMP_B:
 			var err error
 			i, err = vm.jump_b(i)

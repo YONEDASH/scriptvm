@@ -56,9 +56,6 @@ func newExternalCallback(f any) (NativeFunc, error) {
 
 		vmType := TypeOf(val)
 
-		fmt.Println(i, vmType, in)
-		fmt.Printf("type=%T valtype=%T\n", in, val)
-
 		if vmType != Invalid {
 			types[i] = vmType
 			continue

@@ -9,217 +9,245 @@ import (
 )
 
 type compiler struct {
-	bytecode *vm.Bytecode
-	// functions Stores the index of the function in the bytecode
-	functions map[string]int
+	bc        *vm.Bytecode
+	loopBegin stack[int]
+	loopEnd   stack[int]
 }
 
 func Compile(bytecode *vm.Bytecode, program *ast.Program) error {
+	c := &compiler{
+		bc:        bytecode,
+		loopBegin: make(stack[int], 4),
+		loopEnd:   make(stack[int], 4),
+	}
+
 	for _, stmt := range program.Statements {
-		if err := compileStmt(bytecode, stmt); err != nil {
+		if err := c.compileStmt(stmt); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func compileStmt(bc *vm.Bytecode, stmt ast.Stmt) error {
+func (out *compiler) compileStmt(stmt ast.Stmt) error {
 	switch s := stmt.(type) {
 	case *ast.DeclareStmt:
-		return compileDeclareStmt(bc, s)
+		return out.compileDeclareStmt(s)
 	case *ast.AssignStmt:
-		return compileAssignStmt(bc, s)
+		return out.compileAssignStmt(s)
 	case *ast.BlockStmt:
-		return compileBlockStmt(bc, s, true)
+		return out.compileBlockStmt(s, true)
 	case *ast.ConditionalStmt:
-		return compileConditionalStmt(bc, s)
+		return out.compileConditionalStmt(s)
 	case *ast.ReturnStmt:
-		return compileReturnStmt(bc, s)
+		return out.compileReturnStmt(s)
 	case *ast.ArrayAssignStmt:
-		return compileArrayAssignStmt(bc, s)
+		return out.compileArrayAssignStmt(s)
 	case *ast.ForStmt:
-		return compileForStmt(bc, s)
+		return out.compileForStmt(s)
 	case *ast.ContinueStmt:
-		return compileContinueStmt(bc, s)
+		return out.compileContinueStmt(s)
 	case *ast.BreakStmt:
-		return compileBreakStmt(bc, s)
+		return out.compileBreakStmt(s)
 	default:
 		return ast.NewNodeError(stmt, fmt.Sprintf("unknown statement type %T", stmt))
 	}
 }
 
-func compileContinueStmt(bc *vm.Bytecode, s *ast.ContinueStmt) error {
-	bc.Instruction(vm.JUMP_B, nil)
+func (out *compiler) compileContinueStmt(s *ast.ContinueStmt) error {
+	out.bc.Instruction(vm.JUMP, out.loopBegin.top())
 	return nil
 }
 
-func compileBreakStmt(bc *vm.Bytecode, s *ast.BreakStmt) error {
-	bc.Instruction(vm.RET, nil)
+func (out *compiler) compileBreakStmt(s *ast.BreakStmt) error {
+	out.bc.Instruction(vm.JUMP, out.loopEnd.top())
 	return nil
 }
 
-func compileConditionalStmt(bc *vm.Bytecode, s *ast.ConditionalStmt) error {
-	if err := compileExpr(bc, s.Cond); err != nil {
+func (out *compiler) compileConditionalStmt(s *ast.ConditionalStmt) error {
+	if err := out.compileExpr(s.Cond); err != nil {
 		return err
 	}
 
-	jumpFalseIndex := bc.Len()
-	bc.Instruction(vm.JUMP_F, -100)
+	jumpFalseIndex := out.bc.Len()
+	out.bc.Instruction(vm.JUMP_F, -100)
 
-	if err := compileBlockStmt(bc, s.Block, true); err != nil {
+	if err := out.compileBlockStmt(s.Block, true); err != nil {
 		return err
 	}
 
 	if s.Else != nil {
-		jumpTrueIndex := bc.Len()
-		bc.Instruction(vm.JUMP, -200)
+		jumpTrueIndex := out.bc.Len()
+		out.bc.Instruction(vm.JUMP, -200)
 
-		bc.SetArg(jumpFalseIndex, bc.Len())
+		out.bc.SetArg(jumpFalseIndex, out.bc.Len())
 
-		if err := compileStmt(bc, s.Else); err != nil {
+		if err := out.compileStmt(s.Else); err != nil {
 			return err
 		}
-		bc.SetArg(jumpTrueIndex, bc.Len())
+		out.bc.SetArg(jumpTrueIndex, out.bc.Len())
 	} else {
-		bc.SetArg(jumpFalseIndex, bc.Len())
+		out.bc.SetArg(jumpFalseIndex, out.bc.Len())
 	}
 
 	return nil
 }
 
-func compileDeclareStmt(bc *vm.Bytecode, s *ast.DeclareStmt) error {
-	if err := compileExpr(bc, s.Expr); err != nil {
+func (out *compiler) compileDeclareStmt(s *ast.DeclareStmt) error {
+	if err := out.compileExpr(s.Expr); err != nil {
 		return err
 	}
-	bc.Instruction(vm.DECLARE, s.Ident.Symbol)
+	out.bc.Instruction(vm.DECLARE, s.Ident.Symbol)
 	return nil
 }
 
-func compileAssignStmt(bc *vm.Bytecode, s *ast.AssignStmt) error {
-	if err := compileExpr(bc, s.Expr); err != nil {
+func (out *compiler) compileAssignStmt(s *ast.AssignStmt) error {
+	if err := out.compileExpr(s.Expr); err != nil {
 		return err
 	}
 	if s.Ident != nil {
-		bc.Instruction(vm.STORE, s.Ident.Symbol)
+		out.bc.Instruction(vm.STORE, s.Ident.Symbol)
 	} else {
-		bc.Instruction(vm.POP, nil)
+		out.bc.Instruction(vm.POP, nil)
 	}
 	return nil
 }
 
-func compileBlockStmt(bc *vm.Bytecode, s *ast.BlockStmt, scope bool) error {
+func (out *compiler) compileBlockStmt(s *ast.BlockStmt, scope bool) error {
 	if scope {
-		bc.Instruction(vm.ENTER, nil)
+		out.bc.Instruction(vm.ENTER, nil)
 	}
 
 	for _, stmt := range s.Statements {
-		if err := compileStmt(bc, stmt); err != nil {
+		if err := out.compileStmt(stmt); err != nil {
 			return err
 		}
 	}
 
 	if scope {
-		bc.Instruction(vm.LEAVE, nil)
+		out.bc.Instruction(vm.LEAVE, nil)
 	}
 	return nil
 }
 
-func compileReturnStmt(bc *vm.Bytecode, s *ast.ReturnStmt) error {
+func (out *compiler) compileReturnStmt(s *ast.ReturnStmt) error {
 	//// Push return expressions in reverse
 	//for i := len(s.Returned) - 1; i >= 0; i-- {
-	//	if err := compileExpr(bc, s.Returned[i]); err != nil {
+	//	if err := out.compileExpr(s.Returned[i]); err != nil {
 	//		return err
 	//	}
 	//}
 	//
 	//// Push int with amount of arguments
-	//bc.Instruction(vm.PUSH, len(s.Returned))
+	//out.bc.Instruction(vm.PUSH, len(s.Returned))
 
 	// TODO Multiple return values
 	if len(s.Returned) > 0 {
 
-		if err := compileExpr(bc, s.Returned[0]); err != nil {
+		if err := out.compileExpr(s.Returned[0]); err != nil {
 			return err
 		}
 
 	} else {
-		bc.Instruction(vm.PUSH, nil)
+		out.bc.Instruction(vm.PUSH, nil)
 	}
-	bc.Instruction(vm.RET, nil)
+	out.bc.Instruction(vm.RET, nil)
 
 	return nil
 }
 
-func compileForStmt(bc *vm.Bytecode, s *ast.ForStmt) error {
-	bc.Instruction(vm.ENTER, nil)
+func (out *compiler) compileForStmt(s *ast.ForStmt) error {
+	out.bc.Instruction(vm.ENTER, nil)
 
 	if s.Init != nil {
-		if err := compileStmt(bc, s.Init); err != nil {
+		if err := out.compileStmt(s.Init); err != nil {
 			return err
 		}
 	}
 
-	startIndex := bc.Len()
-	var jumpIndex int
-	if s.Cond != nil {
-		if err := compileExpr(bc, s.Cond); err != nil {
+	out.bc.Instruction(vm.ANCHOR, nil)
+
+	// BREAK
+	skipBreakIndex := out.bc.Len()
+	out.bc.Instruction(vm.JUMP, -1)
+	endIndex := out.bc.Len()
+	out.loopEnd.push(endIndex)
+	out.bc.Instruction(vm.RESCUE, nil)
+	endJumpIndex := out.bc.Len()
+	out.bc.Instruction(vm.JUMP, -1)
+	out.bc.SetArg(skipBreakIndex, out.bc.Len())
+
+	// CONTINUE
+	skipContinueIndex := out.bc.Len()
+	out.bc.Instruction(vm.JUMP, -1)
+	startIndex := out.bc.Len()
+	out.loopBegin.push(startIndex)
+	out.bc.Instruction(vm.RESCUE, nil)
+
+	if s.Update != nil {
+		if err := out.compileStmt(s.Update); err != nil {
 			return err
 		}
-		jumpIndex = bc.Len()
-		bc.Instruction(vm.JUMP_F, nil)
+	}
+
+	out.bc.SetArg(skipContinueIndex, out.bc.Len())
+
+	var jumpIndex int
+	if s.Cond != nil {
+		if err := out.compileExpr(s.Cond); err != nil {
+			return err
+		}
+		jumpIndex = out.bc.Len()
+		out.bc.Instruction(vm.JUMP_F, nil)
 	}
 
 	//
-	if err := compileStmt(bc, s.Stmt); err != nil {
+	if err := out.compileStmt(s.Stmt); err != nil {
 		return err
 	}
 	//
 
-	if s.Update != nil {
-		if err := compileStmt(bc, s.Update); err != nil {
-			return err
-		}
-	}
-
-	bc.Instruction(vm.JUMP, startIndex)
+	out.bc.Instruction(vm.JUMP, startIndex)
 
 	if s.Cond != nil {
-		bc.SetArg(jumpIndex, bc.Len())
+		out.bc.SetArg(jumpIndex, out.bc.Len())
 	}
-	bc.Instruction(vm.LEAVE, nil)
+	out.bc.SetArg(endJumpIndex, out.bc.Len())
+
+	out.bc.Instruction(vm.LEAVE, nil)
 	return nil
 }
 
-func compileExpr(bc *vm.Bytecode, expr ast.Expr) error {
+func (out *compiler) compileExpr(expr ast.Expr) error {
 	switch e := expr.(type) {
 	case *ast.BinaryExpr:
-		if err := compileBinaryExpr(bc, e); err != nil {
+		if err := out.compileBinaryExpr(e); err != nil {
 			return err
 		}
 	case *ast.UnaryExpr:
-		if err := compileUnaryExpr(bc, e); err != nil {
+		if err := out.compileUnaryExpr(e); err != nil {
 			return err
 		}
 	case *ast.Number:
-		if err := compileNumber(bc, e); err != nil {
+		if err := out.compileNumber(e); err != nil {
 			return err
 		}
 	case *ast.Identifier:
-		bc.Instruction(vm.LOAD, e.Symbol)
+		out.bc.Instruction(vm.LOAD, e.Symbol)
 	case *ast.FunctionExpr:
-		if err := compileFunctionExpr(bc, e); err != nil {
+		if err := out.compileFunctionExpr(e); err != nil {
 			return err
 		}
 	case *ast.CallExpr:
-		if err := compileCallExpr(bc, e); err != nil {
+		if err := out.compileCallExpr(e); err != nil {
 			return err
 		}
 	case *ast.SubscriptExpr:
-		if err := compileSubscriptExpr(bc, e); err != nil {
+		if err := out.compileSubscriptExpr(e); err != nil {
 			return err
 		}
 	case *ast.ArrayExpr:
-		if err := compileArrayExpr(bc, e); err != nil {
+		if err := out.compileArrayExpr(e); err != nil {
 			return err
 		}
 	default:
@@ -228,115 +256,115 @@ func compileExpr(bc *vm.Bytecode, expr ast.Expr) error {
 	return nil
 }
 
-func compileArrayAssignStmt(bc *vm.Bytecode, s *ast.ArrayAssignStmt) error {
-	if err := compileExpr(bc, s.Expr); err != nil {
+func (out *compiler) compileArrayAssignStmt(s *ast.ArrayAssignStmt) error {
+	if err := out.compileExpr(s.Expr); err != nil {
 		return err
 	}
-	if err := compileExpr(bc, s.Ident); err != nil {
+	if err := out.compileExpr(s.Ident); err != nil {
 		return err
 	}
-	if err := compileExpr(bc, s.Index); err != nil {
+	if err := out.compileExpr(s.Index); err != nil {
 		return err
 	}
-	bc.Instruction(vm.ARR_V, nil)
+	out.bc.Instruction(vm.ARR_V, nil)
 	return nil
 }
 
-func compileNumber(bc *vm.Bytecode, e *ast.Number) error {
+func (out *compiler) compileNumber(e *ast.Number) error {
 	f, err := strconv.ParseFloat(e.Value, 64)
 	if err != nil {
 		panic(err)
 	}
-	bc.Instruction(vm.PUSH, f)
+	out.bc.Instruction(vm.PUSH, f)
 	return nil
 }
 
-func compileBinaryExpr(bc *vm.Bytecode, e *ast.BinaryExpr) error {
+func (out *compiler) compileBinaryExpr(e *ast.BinaryExpr) error {
 	// Check for operations that will short circuit
 	switch e.Operator {
 	case lexer.PIPE_PIPE:
-		if err := compileExpr(bc, e.Left); err != nil {
+		if err := out.compileExpr(e.Left); err != nil {
 			return err
 		}
-		jumpTrueIndex := bc.Len()
-		bc.Instruction(vm.JUMP_T, -1)
+		jumpTrueIndex := out.bc.Len()
+		out.bc.Instruction(vm.JUMP_T, -1)
 
 		// If not true
-		if err := compileExpr(bc, e.Right); err != nil {
+		if err := out.compileExpr(e.Right); err != nil {
 			return err
 		}
-		secondTrueIndex := bc.Len()
-		bc.Instruction(vm.JUMP_T, -1)
+		secondTrueIndex := out.bc.Len()
+		out.bc.Instruction(vm.JUMP_T, -1)
 
 		// If false
-		bc.Instruction(vm.PUSH, false) // <- will arrive here if false
-		exitIndex := bc.Len()
-		bc.Instruction(vm.JUMP, -1)
+		out.bc.Instruction(vm.PUSH, false) // <- will arrive here if false
+		exitIndex := out.bc.Len()
+		out.bc.Instruction(vm.JUMP, -1)
 
 		// If true
-		bc.SetArg(jumpTrueIndex, bc.Len())
-		bc.SetArg(secondTrueIndex, bc.Len())
-		bc.Instruction(vm.PUSH, true) // <- jump here if true
-		bc.SetArg(exitIndex, bc.Len())
+		out.bc.SetArg(jumpTrueIndex, out.bc.Len())
+		out.bc.SetArg(secondTrueIndex, out.bc.Len())
+		out.bc.Instruction(vm.PUSH, true) // <- jump here if true
+		out.bc.SetArg(exitIndex, out.bc.Len())
 
 		return nil
 	case lexer.AND_AND:
-		if err := compileExpr(bc, e.Left); err != nil {
+		if err := out.compileExpr(e.Left); err != nil {
 			return err
 		}
-		jumpFalseIndex := bc.Len()
-		bc.Instruction(vm.JUMP_F, -1)
+		jumpFalseIndex := out.bc.Len()
+		out.bc.Instruction(vm.JUMP_F, -1)
 
 		// If not true
-		if err := compileExpr(bc, e.Right); err != nil {
+		if err := out.compileExpr(e.Right); err != nil {
 			return err
 		}
-		secondFalseIndex := bc.Len()
-		bc.Instruction(vm.JUMP_F, -1)
+		secondFalseIndex := out.bc.Len()
+		out.bc.Instruction(vm.JUMP_F, -1)
 
 		// If true
-		bc.Instruction(vm.PUSH, true) // <- will arrive here if true
-		exitIndex := bc.Len()
-		bc.Instruction(vm.JUMP, -1)
+		out.bc.Instruction(vm.PUSH, true) // <- will arrive here if true
+		exitIndex := out.bc.Len()
+		out.bc.Instruction(vm.JUMP, -1)
 
 		// If false
-		bc.SetArg(jumpFalseIndex, bc.Len())
-		bc.SetArg(secondFalseIndex, bc.Len())
-		bc.Instruction(vm.PUSH, false) // <- jump here if false
-		bc.SetArg(exitIndex, bc.Len())
+		out.bc.SetArg(jumpFalseIndex, out.bc.Len())
+		out.bc.SetArg(secondFalseIndex, out.bc.Len())
+		out.bc.Instruction(vm.PUSH, false) // <- jump here if false
+		out.bc.SetArg(exitIndex, out.bc.Len())
 
 		return nil
 	default:
 	}
 
-	if err := compileExpr(bc, e.Left); err != nil {
+	if err := out.compileExpr(e.Left); err != nil {
 		return err
 	}
-	if err := compileExpr(bc, e.Right); err != nil {
+	if err := out.compileExpr(e.Right); err != nil {
 		return err
 	}
 	switch e.Operator {
 	case lexer.PLUS:
-		bc.Instruction(vm.ADD, nil)
+		out.bc.Instruction(vm.ADD, nil)
 	case lexer.MINUS:
-		bc.Instruction(vm.SUB, nil)
+		out.bc.Instruction(vm.SUB, nil)
 	case lexer.ASTERISK:
-		bc.Instruction(vm.MUL, nil)
+		out.bc.Instruction(vm.MUL, nil)
 	case lexer.SLASH:
-		bc.Instruction(vm.DIV, nil)
+		out.bc.Instruction(vm.DIV, nil)
 	case lexer.EQUALS_EQUALS:
-		bc.Instruction(vm.CMP, nil)
+		out.bc.Instruction(vm.CMP, nil)
 	case lexer.EXCLAMATION_EQUALS:
-		bc.Instruction(vm.CMP, nil)
-		bc.Instruction(vm.NOT, nil)
+		out.bc.Instruction(vm.CMP, nil)
+		out.bc.Instruction(vm.NOT, nil)
 	case lexer.LESS_THAN:
-		bc.Instruction(vm.CMP_LT, nil)
+		out.bc.Instruction(vm.CMP_LT, nil)
 	case lexer.GREATER_THAN:
-		bc.Instruction(vm.CMP_GT, nil)
+		out.bc.Instruction(vm.CMP_GT, nil)
 	case lexer.LESS_THAN_EQUALS:
-		bc.Instruction(vm.CMP_LTE, nil)
+		out.bc.Instruction(vm.CMP_LTE, nil)
 	case lexer.GREATER_THAN_EQUALS:
-		bc.Instruction(vm.CMP_GTE, nil)
+		out.bc.Instruction(vm.CMP_GTE, nil)
 	default:
 		return ast.NewNodeError(e, "unknown operator in binary expression")
 	}
@@ -344,16 +372,16 @@ func compileBinaryExpr(bc *vm.Bytecode, e *ast.BinaryExpr) error {
 	return nil
 }
 
-func compileUnaryExpr(bc *vm.Bytecode, e *ast.UnaryExpr) error {
-	if err := compileExpr(bc, e.Expr); err != nil {
+func (out *compiler) compileUnaryExpr(e *ast.UnaryExpr) error {
+	if err := out.compileExpr(e.Expr); err != nil {
 		return err
 	}
 
 	switch e.Operator {
 	case lexer.EXCLAMATION:
-		bc.Instruction(vm.NOT, nil)
+		out.bc.Instruction(vm.NOT, nil)
 	case lexer.MINUS:
-		bc.Instruction(vm.NEG, nil)
+		out.bc.Instruction(vm.NEG, nil)
 	case lexer.PLUS:
 		// Do nothing
 	default:
@@ -363,43 +391,43 @@ func compileUnaryExpr(bc *vm.Bytecode, e *ast.UnaryExpr) error {
 	return nil
 }
 
-func compileFunctionExpr(bc *vm.Bytecode, e *ast.FunctionExpr) error {
-	jumpIndex := bc.Len()
-	bc.Instruction(vm.JUMP, -1)
+func (out *compiler) compileFunctionExpr(e *ast.FunctionExpr) error {
+	jumpIndex := out.bc.Len()
+	out.bc.Instruction(vm.JUMP, -1)
 
-	bc.Instruction(vm.ENTER, nil)
+	out.bc.Instruction(vm.ENTER, nil)
 
-	argCountLabel := fmt.Sprintf("_argcount%d", bc.Len())
+	argCountLabel := fmt.Sprintf("_argcount%d", out.bc.Len())
 
 	if !e.IsVariadic {
 		// Check if arg count matches exactly
-		bc.Instruction(vm.PUSH, len(e.Params))
-		bc.Instruction(vm.CMP, nil)
+		out.bc.Instruction(vm.PUSH, len(e.Params))
+		out.bc.Instruction(vm.CMP, nil)
 	} else {
 		// Declare arg count
-		bc.Instruction(vm.DECLARE, argCountLabel)
+		out.bc.Instruction(vm.DECLARE, argCountLabel)
 
-		bc.Instruction(vm.LOAD, argCountLabel)
-		bc.Instruction(vm.PUSH, len(e.Params)-1) // Variadic args do accept an empty array.
+		out.bc.Instruction(vm.LOAD, argCountLabel)
+		out.bc.Instruction(vm.PUSH, len(e.Params)-1) // Variadic args do accept an empty array.
 		// Check if arg count matches or is greater
-		bc.Instruction(vm.CMP_GTE, nil)
+		out.bc.Instruction(vm.CMP_GTE, nil)
 	}
 
-	checkSuccessIndex := bc.Len()
-	bc.Instruction(vm.JUMP_T, -1)
+	checkSuccessIndex := out.bc.Len()
+	out.bc.Instruction(vm.JUMP_T, -1)
 
 	// Return arg count error
-	bc.Instruction(vm.PUSH, -1)
-	compilePanic(bc, "arg count mismatch")
+	out.bc.Instruction(vm.PUSH, -1)
+	out.compilePanic("arg count mismatch")
 
-	bc.SetArg(checkSuccessIndex, bc.Len())
+	out.bc.SetArg(checkSuccessIndex, out.bc.Len())
 
 	for i, param := range e.Params {
 		if e.IsVariadic && i >= len(e.Params)-1 {
 			break
 		}
 
-		bc.Instruction(vm.DECLARE, param.Symbol)
+		out.bc.Instruction(vm.DECLARE, param.Symbol)
 	}
 
 	if !e.IsVariadic {
@@ -408,88 +436,88 @@ func compileFunctionExpr(bc *vm.Bytecode, e *ast.FunctionExpr) error {
 		index := len(e.Params) - 1
 
 		// Calculate array size
-		bc.Instruction(vm.LOAD, argCountLabel)
-		bc.Instruction(vm.PUSH, len(e.Params)-1)
-		bc.Instruction(vm.SUB, nil)
+		out.bc.Instruction(vm.LOAD, argCountLabel)
+		out.bc.Instruction(vm.PUSH, len(e.Params)-1)
+		out.bc.Instruction(vm.SUB, nil)
 
-		bc.Instruction(vm.ARR_CR, nil)
+		out.bc.Instruction(vm.ARR_CR, nil)
 
-		bc.Instruction(vm.DECLARE, e.Params[index].Symbol)
+		out.bc.Instruction(vm.DECLARE, e.Params[index].Symbol)
 	}
 
-	if err := compileBlockStmt(bc, e.Body, false); err != nil {
+	if err := out.compileBlockStmt(e.Body, false); err != nil {
 		return err
 	}
 
-	bc.Instruction(vm.LEAVE, nil)
+	out.bc.Instruction(vm.LEAVE, nil)
 
 	// TODO Will need to inject the return statement later. It IS required.
-	//bc.Instruction(vm.PUSH, 0) // Returning no values
+	//out.bc.Instruction(vm.PUSH, 0) // Returning no values
 	//
-	//bc.Instruction(vm.PUSH, nil) // Return nil
-	//bc.Instruction(vm.RET, "NOTHING")
+	//out.bc.Instruction(vm.PUSH, nil) // Return nil
+	//out.bc.Instruction(vm.RET, "NOTHING")
 
-	bc.SetArg(jumpIndex, bc.Len())
+	out.bc.SetArg(jumpIndex, out.bc.Len())
 
-	// Push index of function start. It is basically a pointer.
+	// Push index of func (out *compiler)tion start. It is basically a pointer.
 
 	function := vm.Func{
 		Address: jumpIndex + 1,
 	}
 
-	bc.Instruction(vm.PUSH, function)
+	out.bc.Instruction(vm.PUSH, function)
 
 	return nil
 }
 
-func compilePanic(bc *vm.Bytecode, s string) {
-	bc.Instruction(vm.PANIC, s)
+func (out *compiler) compilePanic(s string) {
+	out.bc.Instruction(vm.PANIC, s)
 }
 
-func compileCallExpr(bc *vm.Bytecode, e *ast.CallExpr) error {
+func (out *compiler) compileCallExpr(e *ast.CallExpr) error {
 	// Push argument expressions in reverse to be declared in order in the call
 	for i := len(e.Args) - 1; i >= 0; i-- {
-		if err := compileExpr(bc, e.Args[i]); err != nil {
+		if err := out.compileExpr(e.Args[i]); err != nil {
 			return err
 		}
 	}
 
 	// Arg count
-	bc.Instruction(vm.PUSH, len(e.Args))
+	out.bc.Instruction(vm.PUSH, len(e.Args))
 
-	if err := compileExpr(bc, e.Caller); err != nil {
+	if err := out.compileExpr(e.Caller); err != nil {
 		return err
 	}
 
-	frameReturnIndex := bc.Len()
-	bc.Instruction(vm.FRAME, -1)
+	frameReturnIndex := out.bc.Len()
+	out.bc.Instruction(vm.FRAME, -1)
 
-	bc.Instruction(vm.CALL, nil)
-	bc.SetArg(frameReturnIndex, bc.Len())
+	out.bc.Instruction(vm.CALL, nil)
+	out.bc.SetArg(frameReturnIndex, out.bc.Len())
 
 	return nil
 }
 
-func compileArrayExpr(bc *vm.Bytecode, e *ast.ArrayExpr) error {
+func (out *compiler) compileArrayExpr(e *ast.ArrayExpr) error {
 	// Push argument expressions in reverse to be in order
 	for i := len(e.Elements) - 1; i >= 0; i-- {
-		if err := compileExpr(bc, e.Elements[i]); err != nil {
+		if err := out.compileExpr(e.Elements[i]); err != nil {
 			return err
 		}
 	}
 
-	bc.Instruction(vm.PUSH, len(e.Elements))
-	bc.Instruction(vm.ARR_CR, nil)
+	out.bc.Instruction(vm.PUSH, len(e.Elements))
+	out.bc.Instruction(vm.ARR_CR, nil)
 	return nil
 }
 
-func compileSubscriptExpr(bc *vm.Bytecode, e *ast.SubscriptExpr) error {
-	if err := compileExpr(bc, e.Array); err != nil {
+func (out *compiler) compileSubscriptExpr(e *ast.SubscriptExpr) error {
+	if err := out.compileExpr(e.Array); err != nil {
 		return err
 	}
-	if err := compileExpr(bc, e.Index); err != nil {
+	if err := out.compileExpr(e.Index); err != nil {
 		return err
 	}
-	bc.Instruction(vm.ARR_ID, nil)
+	out.bc.Instruction(vm.ARR_ID, nil)
 	return nil
 }

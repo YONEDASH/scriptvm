@@ -59,6 +59,9 @@ const (
 	// JUMP_B Returns to the instruction after beginning of the last frame while keeping it. <=> RET
 	JUMP_B
 
+	ANCHOR
+	RESCUE
+
 	// ARR_CR Creates an array. Array size on top of stack followed by elements.
 	ARR_CR
 	// ARR_ID Indexes into an array. TypeId will be pushed on top of stack.

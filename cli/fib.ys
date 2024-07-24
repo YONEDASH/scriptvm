@@ -1,11 +1,16 @@
-fib := fn (i) {
-    if i == 0 {
+fib := fn (n) {
+    if n <= 0 {
         return 0
     }
-    if i <= 2 {
-        return 1
+    t1 := 0
+    t2 := 1
+    nextTerm := t2
+    for i := 3, i <= n, i++ {
+        t1 = t2
+        t2 = nextTerm
+        nextTerm = t1 + t2
     }
-    return fib(i-1) + fib(i-2)
+    return nextTerm
 }
 
-result := fib(10)
+println(fib(123))

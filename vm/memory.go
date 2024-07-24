@@ -14,6 +14,7 @@ type Frame struct {
 	Declared map[string]any
 	// end is the index of the instruction which invoked the function.
 	start, end int
+	anchor     bool
 }
 
 func (f *Frame) End() (*Frame, int) {
@@ -22,6 +23,13 @@ func (f *Frame) End() (*Frame, int) {
 	}
 
 	return f, f.end
+}
+
+func (f *Frame) Anchor() *Frame {
+	if f.Parent != nil && !f.anchor {
+		return f.Parent.Anchor()
+	}
+	return f
 }
 
 func (f *Frame) Assign(name string, v any) {
