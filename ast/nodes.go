@@ -257,12 +257,13 @@ func (r *ReturnStmt) String() string {
 func (r *ReturnStmt) stmt() {}
 
 type ForStmt struct {
-	Pre   Stmt
-	Block *BlockStmt
+	Pre  Stmt
+	Post Stmt
+	Stmt Stmt
 }
 
 func (l *ForStmt) Tok() lexer.Token {
-	return l.Block.Tok()
+	return l.Stmt.Tok()
 }
 
 func (l *ForStmt) String() string {

@@ -163,8 +163,17 @@ func compileForStmt(bc *vm.Bytecode, s *ast.ForStmt) error {
 		}
 	}
 
-	if err := compileBlockStmt(bc, s.Block, false); err != nil {
-		return err
+	innerFrameIndex := bc.Len()
+	bc.Instruction(vm.FRAME, -1)
+
+	if block, ok := s.Stmt.(*ast.BlockStmt); ok {
+		if err := compileBlockStmt(bc, block, false); err != nil {
+			return err
+		}
+	} else {
+		if err := compileStmt(bc, block); err != nil {
+			return err
+		}
 	}
 
 	bc.Instruction(vm.LEAVE, nil)

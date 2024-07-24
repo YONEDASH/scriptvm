@@ -118,8 +118,16 @@ func Tokenize(input []byte) ([]Token, []error) {
 		case '\n':
 			tr.push(LF, tr.lex(0, 1))
 		case '+':
+			if tr.get(1) == '+' {
+				tr.push(PLUS_PLUS, tr.lex(0, 2))
+				continue
+			}
 			tr.push(PLUS, tr.lex(0, 1))
 		case '-':
+			if tr.get(1) == '-' {
+				tr.push(MINUS_MINUS, tr.lex(0, 2))
+				continue
+			}
 			tr.push(MINUS, tr.lex(0, 1))
 		case '*':
 			tr.push(ASTERISK, tr.lex(0, 1))

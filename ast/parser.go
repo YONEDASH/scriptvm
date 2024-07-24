@@ -146,6 +146,26 @@ func (p *parser) parseStmt() (Stmt, error) {
 			return p.parseDeclareStmt(n)
 		case lexer.EQUALS:
 			return p.parseAssignStmt(n)
+		case lexer.PLUS_PLUS:
+			p.consume()
+			return &AssignStmt{
+				Ident: n,
+				Expr: &BinaryExpr{
+					Left:     n,
+					Operator: lexer.PLUS,
+					Right:    &Number{Value: "1", tok: p.get(0)},
+				},
+			}, nil
+		case lexer.MINUS_MINUS:
+			p.consume()
+			return &AssignStmt{
+				Ident: n,
+				Expr: &BinaryExpr{
+					Left:     n,
+					Operator: lexer.MINUS,
+					Right:    &Number{Value: "1", tok: p.get(0)},
+				},
+			}, nil
 		default:
 			return nil, lexer.NewTokError(p.get(1), "expected statement (identifier)")
 		}
@@ -768,16 +788,69 @@ func (p *parser) parseForStmt() (Stmt, error) {
 		return nil, err
 	}
 
+	if p.get(0).Id == lexer.OPEN_BRACE {
+		block, err := p.parseBlockStmt()
+		if err != nil {
+			return nil, err
+		}
+
+		return &ForStmt{
+			Stmt: block,
+		}, nil
+	}
+
+	divider := lexer.COMMA
+
+	var err error
+	var init, update Stmt
+	var check Expr
+
+	if p.get(0).Id != divider {
+		init, err = p.parseStmt()
+		if err != nil {
+			return nil, errors.Join(err, lexer.NewTokError(p.get(0), "expected init statement"))
+		}
+	}
+
+	if _, err := p.expect(divider, "expected comma"); err != nil {
+		return nil, err
+	}
+
+	if p.get(0).Id != divider {
+		check, err = p.parseExpr()
+		if err != nil {
+			return nil, errors.Join(err, lexer.NewTokError(p.get(0), "expected init statement"))
+		}
+	}
+
+	if _, err := p.expect(divider, "expected comma"); err != nil {
+		return nil, err
+	}
+
+	if p.get(0).Id != lexer.OPEN_BRACE {
+		update, err = p.parseStmt()
+		if err != nil {
+			return nil, errors.Join(err, lexer.NewTokError(p.get(0), "expected check expression"))
+		}
+	}
+
 	block, err := p.parseBlockStmt()
 	if err != nil {
 		return nil, err
 	}
 
-	stmt := &ForStmt{
-		Block: block,
-	}
-
-	return stmt, nil
+	return &ForStmt{
+		Pre: init,
+		Stmt: &ConditionalStmt{
+			Cond:  check,
+			Block: &BlockStmt{},
+			Else: &BlockStmt{
+				Statements: []Stmt{
+					&BreakStmt{tok: p.get(0)},
+				},
+			},
+		},
+	}, nil
 }
 
 func (p *parser) parseCallStmt(n *CallExpr) (Stmt, error) {
