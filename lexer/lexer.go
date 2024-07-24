@@ -183,6 +183,11 @@ func Tokenize(input []byte) ([]Token, []error) {
 			tr.push(PIPE, tr.lex(0, 1))
 		case ',':
 			tr.push(COMMA, tr.lex(0, 1))
+		case '.':
+			if tr.get(1) == tr.get(2) && tr.get(2) == '.' {
+				tr.push(DOT_DOT_DOT, tr.lex(0, 3))
+			}
+			tr.push(DOT, tr.lex(0, 1))
 		default:
 			if unicode.IsLetter(r) || (tr.buffer.Len() > 0 && unicode.IsDigit(r)) {
 				tr.buffer.Append(r)

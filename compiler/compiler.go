@@ -346,6 +346,9 @@ func compileCallExpr(bc *vm.Bytecode, e *ast.CallExpr) error {
 		}
 	}
 
+	// Arg count
+	bc.Instruction(vm.PUSH, len(e.Args))
+
 	if err := compileExpr(bc, e.Caller); err != nil {
 		return err
 	}

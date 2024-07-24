@@ -17,6 +17,10 @@ func New() *VM {
 	vm.global.Declare("float", Type{Float})
 	vm.global.Declare("bool", Type{Bool})
 
+	vm.global.Declare("println", NewExternalFunc(func(v ...any) {
+		fmt.Println(v...)
+	}))
+
 	return vm
 }
 
@@ -301,15 +305,20 @@ func (vm *VM) arraySet() {
 }
 
 func (vm *VM) call(i *int) {
+	argCount := vm.stack.Pop().(int)
 	top := vm.stack.Pop()
 
 	address := -1
 
 	switch t := top.(type) {
+	case Type:
+		vm.cast(t.Id)
+		return
 	case Func:
 		address = t.Address
-	case Type:
-		vm.cast(t)
+	case ExternalFunc:
+		result := t.Callback(vm, argCount)
+		vm.stack.Push(result)
 		return
 	default:
 		log.Fatalf("cannot call non-function %v", top)
@@ -322,11 +331,19 @@ func (vm *VM) call(i *int) {
 	*i = address
 }
 
-func (vm *VM) cast(t Type) {
+func (vm *VM) cast(t TypeId) {
 	v := vm.stack.Pop()
 	vt := TypeOf(v)
 
-	switch t.Id {
+	switch t {
+	case Any:
+		vm.stack.Push(v)
+		return
+	case Array:
+		if vt != Array {
+			log.Fatalf("cannot cast to array from %v", vt)
+		}
+		vm.stack.Push(v.([]any))
 	case Int:
 		switch vt {
 		case Int:

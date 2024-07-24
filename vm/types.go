@@ -10,11 +10,13 @@ type TypeId uint8
 
 const (
 	Invalid TypeId = iota
+	Any
 	Int
 	Float
 	Bool
 	Function
 	Array
+	ExternalFunction
 )
 
 func TypeOf(v any) TypeId {
@@ -29,6 +31,8 @@ func TypeOf(v any) TypeId {
 		return Function
 	case []any:
 		return Array
+	case any:
+		return Any
 	default:
 		return Invalid
 	}
@@ -45,6 +49,10 @@ func (t Type) String() string {
 type Func struct {
 	//Params []string
 	Address int
+}
+
+type ExternalFunc struct {
+	Callback NativeFunc `json:"-"`
 }
 
 func (f Func) String() string {

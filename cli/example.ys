@@ -7,3 +7,5 @@ calc := fn(a,b,c) {
 }
 
 result := calc(f,i,b)
+
+g := println(1,2,3)
