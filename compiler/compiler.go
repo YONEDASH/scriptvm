@@ -309,8 +309,53 @@ func compileFunctionExpr(bc *vm.Bytecode, e *ast.FunctionExpr) error {
 
 	bc.Instruction(vm.ENTER, nil)
 
-	for _, param := range e.Params {
+	argCountLabel := fmt.Sprintf("_argcount%d", bc.Len())
+
+	if !e.IsVariadic {
+		// Check if arg count matches exactly
+		bc.Instruction(vm.PUSH, len(e.Params))
+		bc.Instruction(vm.CMP, nil)
+	} else {
+		// Declare arg count
+		bc.Instruction(vm.DECLARE, argCountLabel)
+
+		bc.Instruction(vm.LOAD, argCountLabel)
+		bc.Instruction(vm.PUSH, len(e.Params))
+		// Check if arg count matches or is greater
+		bc.Instruction(vm.CMP_GTE, nil)
+	}
+
+	checkSuccessIndex := bc.Len()
+	bc.Instruction(vm.JUMP_T, -1)
+
+	// Return arg count error
+	bc.Instruction(vm.PUSH, -1)
+	compilePanic(bc, "arg count mismatch")
+
+	bc.SetArg(checkSuccessIndex, bc.Len())
+
+	for i, param := range e.Params {
+		if e.IsVariadic && i >= len(e.Params)-1 {
+			break
+		}
+
 		bc.Instruction(vm.DECLARE, param.Symbol)
+	}
+
+	if e.IsVariadic {
+		index := len(e.Params) - 1
+
+		// Calculate array size
+		bc.Instruction(vm.LOAD, argCountLabel)
+		bc.Instruction(vm.PUSH, len(e.Params)-1)
+		bc.Instruction(vm.SUB, nil)
+
+		bc.Instruction(vm.ARR_CR, nil)
+
+		bc.Instruction(vm.DECLARE, e.Params[index].Symbol)
+	} else {
+		// Pop arg count
+		bc.Instruction(vm.POP, nil)
 	}
 
 	if err := compileBlockStmt(bc, e.Body, false); err != nil {
@@ -336,6 +381,10 @@ func compileFunctionExpr(bc *vm.Bytecode, e *ast.FunctionExpr) error {
 	bc.Instruction(vm.PUSH, function)
 
 	return nil
+}
+
+func compilePanic(bc *vm.Bytecode, s string) {
+	bc.Instruction(vm.PANIC, s)
 }
 
 func compileCallExpr(bc *vm.Bytecode, e *ast.CallExpr) error {

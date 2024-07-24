@@ -62,6 +62,8 @@ const (
 	ARR_ID
 	// ARR_V Sets an array element. TypeId on top of stack followed by index.
 	ARR_V
+
+	PANIC
 )
 
 type Bytecode []Instr

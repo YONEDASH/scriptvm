@@ -21,6 +21,10 @@ func New() *VM {
 		fmt.Println(v...)
 	}))
 
+	vm.global.Declare("test", NewExternalFunc(func(do func() int) int {
+		return do() * 2
+	}))
+
 	return vm
 }
 
@@ -118,6 +122,8 @@ func (vm *VM) Execute(bc Bytecode) error {
 			vm.arrayIndex()
 		case ARR_V:
 			vm.arraySet()
+		case PANIC:
+			log.Fatalf("panic at %d: %v", i, instr.Arg)
 		default:
 			return fmt.Errorf("unknown opcode %vm in instruction %d", instr.Op, i)
 		}
@@ -212,42 +218,72 @@ func (vm *VM) not() {
 
 func (vm *VM) cmp(code OpCode) {
 	left, right := vm.popBinary()
+	lType := TypeOf(left)
+	rType := TypeOf(right)
 
-	if leftFloat, ok := left.(float64); ok {
-		if rightFloat, ok := right.(float64); ok {
-			switch code {
-			case CMP:
-				vm.stack.Push(leftFloat == rightFloat)
-			case CMP_LT:
-				vm.stack.Push(leftFloat < rightFloat)
-			case CMP_GT:
-				vm.stack.Push(leftFloat > rightFloat)
-			case CMP_LTE:
-				vm.stack.Push(leftFloat <= rightFloat)
-			case CMP_GTE:
-				vm.stack.Push(leftFloat >= rightFloat)
-			default:
-				log.Fatalf("undefined comparison operation %vm", code)
-			}
-			return
-		}
-		log.Fatalf("cannot compare number with non-number %vm", code)
+	if lType != rType {
+		log.Fatalf("cannot compare different types %v and %v", lType, rType)
 	}
 
-	if leftBool, ok := left.(bool); ok {
-		if rightBool, ok := right.(bool); ok {
-			switch code {
-			case CMP:
-				vm.stack.Push(leftBool == rightBool)
-			default:
-				log.Fatalf("undefined comparison operation %vm", code)
+	switch lType {
+	case Int:
+		if leftInt, ok := left.(int); ok {
+			if rightInt, ok := right.(int); ok {
+				switch code {
+				case CMP:
+					vm.stack.Push(leftInt == rightInt)
+				case CMP_LT:
+					vm.stack.Push(leftInt < rightInt)
+				case CMP_GT:
+					vm.stack.Push(leftInt > rightInt)
+				case CMP_LTE:
+					vm.stack.Push(leftInt <= rightInt)
+				case CMP_GTE:
+					vm.stack.Push(leftInt >= rightInt)
+				default:
+					log.Fatalf("undefined comparison operation %v", code)
+				}
+				return
 			}
-			return
+			log.Fatalf("cannot compare integer with non-integer %v", code)
 		}
-		log.Fatalf("cannot compare boolean with non-boolean %vm", code)
+	case Float:
+		if leftFloat, ok := left.(float64); ok {
+			if rightFloat, ok := right.(float64); ok {
+				switch code {
+				case CMP:
+					vm.stack.Push(leftFloat == rightFloat)
+				case CMP_LT:
+					vm.stack.Push(leftFloat < rightFloat)
+				case CMP_GT:
+					vm.stack.Push(leftFloat > rightFloat)
+				case CMP_LTE:
+					vm.stack.Push(leftFloat <= rightFloat)
+				case CMP_GTE:
+					vm.stack.Push(leftFloat >= rightFloat)
+				default:
+					log.Fatalf("undefined comparison operation %v", code)
+				}
+				return
+			}
+			log.Fatalf("cannot compare number with non-number %v", code)
+		}
+	case Bool:
+		if leftBool, ok := left.(bool); ok {
+			if rightBool, ok := right.(bool); ok {
+				switch code {
+				case CMP:
+					vm.stack.Push(leftBool == rightBool)
+				default:
+					log.Fatalf("undefined comparison operation %v", code)
+				}
+				return
+			}
+			log.Fatalf("cannot compare boolean with non-boolean %v", code)
+		}
+	default:
+		log.Fatalf("undefined comparison for type %v of %v", lType, left)
 	}
-
-	log.Fatalf("cannot compare non-number with non-number %vm", code)
 }
 
 func (vm *VM) declare(s string) {
@@ -305,7 +341,6 @@ func (vm *VM) arraySet() {
 }
 
 func (vm *VM) call(i *int) {
-	argCount := vm.stack.Pop().(int)
 	top := vm.stack.Pop()
 
 	address := -1
@@ -317,6 +352,7 @@ func (vm *VM) call(i *int) {
 	case Func:
 		address = t.Address
 	case ExternalFunc:
+		argCount := vm.stack.Pop().(int)
 		result := t.Callback(vm, argCount)
 		vm.stack.Push(result)
 		return

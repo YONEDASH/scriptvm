@@ -297,41 +297,7 @@ func (p *parser) parseBlockStmt() (*BlockStmt, error) {
 }
 
 func (p *parser) parseExpr() (Expr, error) {
-	switch p.get(0).Id {
-	case lexer.FN:
-		return p.parseFunctionExpr()
-	default:
-		return p.parseBinaryExprLogicalOr()
-	}
-}
-
-func (p *parser) parseFunctionExpr() (Expr, error) {
-	if _, err := p.expect(lexer.FN, "fn"); err != nil {
-		return nil, err
-	}
-
-	if _, err := p.expect(lexer.OPEN_PAREN, "open paren in function"); err != nil {
-		return nil, err
-	}
-
-	idents, err := p.parseCommaSeparatedIdent(lexer.CLOSE_PAREN)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err = p.expect(lexer.CLOSE_PAREN, "close paren in function"); err != nil {
-		return nil, err
-	}
-
-	block, err := p.parseBlockStmt()
-	if err != nil {
-		return nil, err
-	}
-
-	return &FunctionExpr{
-		Params: idents,
-		Body:   block,
-	}, nil
+	return p.parseBinaryExprLogicalOr()
 }
 
 func (p *parser) parseBinaryExprLogicalOr() (Expr, error) {
@@ -578,7 +544,7 @@ func (p *parser) parseUnary() (Expr, error) {
 }
 
 func (p *parser) parseCall() (Expr, error) {
-	primary, err := p.parsePrimary()
+	after, err := p.parseFunctionExpr()
 	if err != nil {
 		return nil, err
 	}
@@ -598,8 +564,8 @@ func (p *parser) parseCall() (Expr, error) {
 				return nil, err
 			}
 
-			primary = &CallExpr{
-				Caller: primary,
+			after = &CallExpr{
+				Caller: after,
 				Args:   args,
 			}
 		case lexer.OPEN_BRACKET:
@@ -615,16 +581,52 @@ func (p *parser) parseCall() (Expr, error) {
 				return nil, err
 			}
 
-			primary = &SubscriptExpr{
-				Array: primary,
+			after = &SubscriptExpr{
+				Array: after,
 				Index: index,
 			}
 		default:
-			return primary, nil
+			return after, nil
 		}
 
 	}
 
+}
+
+func (p *parser) parseFunctionExpr() (Expr, error) {
+	if p.get(0).Id != lexer.FN {
+		return p.parsePrimary()
+	}
+	p.consume()
+
+	if _, err := p.expect(lexer.OPEN_PAREN, "open paren in function"); err != nil {
+		return nil, err
+	}
+
+	idents, err := p.parseCommaSeparatedIdent([]lexer.TokenId{lexer.CLOSE_PAREN, lexer.DOT_DOT_DOT})
+	if err != nil {
+		return nil, err
+	}
+
+	variadic := p.get(0).Id == lexer.DOT_DOT_DOT
+	if variadic {
+		p.consume()
+	}
+
+	if _, err = p.expect(lexer.CLOSE_PAREN, "close paren in function"); err != nil {
+		return nil, err
+	}
+
+	block, err := p.parseBlockStmt()
+	if err != nil {
+		return nil, err
+	}
+
+	return &FunctionExpr{
+		Params:     idents,
+		Body:       block,
+		IsVariadic: variadic,
+	}, nil
 }
 
 func (p *parser) parsePrimary() (Expr, error) {
@@ -722,12 +724,18 @@ func (p *parser) parseCommaSeparatedExpr(end lexer.TokenId) ([]Expr, error) {
 	return list, nil
 }
 
-func (p *parser) parseCommaSeparatedIdent(end lexer.TokenId) ([]*Identifier, error) {
+func (p *parser) parseCommaSeparatedIdent(end []lexer.TokenId) ([]*Identifier, error) {
 	list := make([]*Identifier, 0)
 
 	for {
-		if p.done() || p.get(0).Id == end {
+		if p.done() {
 			break
+		}
+
+		for _, e := range end {
+			if p.get(0).Id == e {
+				return list, nil
+			}
 		}
 
 		if len(list) > 0 {

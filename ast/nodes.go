@@ -101,9 +101,9 @@ func (u *UnaryExpr) String() string {
 func (u *UnaryExpr) expr() {}
 
 type FunctionExpr struct {
-	Params   []*Identifier
-	Body     *BlockStmt
-	Variadic bool
+	Params     []*Identifier
+	Body       *BlockStmt
+	IsVariadic bool
 }
 
 func (f *FunctionExpr) Tok() lexer.Token {
