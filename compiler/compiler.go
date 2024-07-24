@@ -37,9 +37,25 @@ func compileStmt(bc *vm.Bytecode, stmt ast.Stmt) error {
 		return compileReturnStmt(bc, s)
 	case *ast.ArrayAssignStmt:
 		return compileArrayAssignStmt(bc, s)
+	case *ast.ForStmt:
+		return compileForStmt(bc, s)
+	case *ast.ContinueStmt:
+		return compileContinueStmt(bc, s)
+	case *ast.BreakStmt:
+		return compileBreakStmt(bc, s)
 	default:
 		return ast.NewNodeError(stmt, fmt.Sprintf("unknown statement type %T", stmt))
 	}
+}
+
+func compileContinueStmt(bc *vm.Bytecode, s *ast.ContinueStmt) error {
+	bc.Instruction(vm.JUMP_B, nil)
+	return nil
+}
+
+func compileBreakStmt(bc *vm.Bytecode, s *ast.BreakStmt) error {
+	bc.Instruction(vm.RET, nil)
+	return nil
 }
 
 func compileConditionalStmt(bc *vm.Bytecode, s *ast.ConditionalStmt) error {
@@ -83,7 +99,11 @@ func compileAssignStmt(bc *vm.Bytecode, s *ast.AssignStmt) error {
 	if err := compileExpr(bc, s.Expr); err != nil {
 		return err
 	}
-	bc.Instruction(vm.STORE, s.Ident.Symbol)
+	if s.Ident != nil {
+		bc.Instruction(vm.STORE, s.Ident.Symbol)
+	} else {
+		bc.Instruction(vm.POP, nil)
+	}
 	return nil
 }
 
@@ -126,6 +146,31 @@ func compileReturnStmt(bc *vm.Bytecode, s *ast.ReturnStmt) error {
 		bc.Instruction(vm.PUSH, nil)
 	}
 	bc.Instruction(vm.RET, nil)
+
+	return nil
+}
+
+func compileForStmt(bc *vm.Bytecode, s *ast.ForStmt) error {
+	frameIndex := bc.Len()
+	bc.Instruction(vm.FRAME, -1)
+
+	startIndex := bc.Len()
+	bc.Instruction(vm.ENTER, nil)
+
+	if s.Pre != nil {
+		if err := compileStmt(bc, s.Pre); err != nil {
+			return err
+		}
+	}
+
+	if err := compileBlockStmt(bc, s.Block, false); err != nil {
+		return err
+	}
+
+	bc.Instruction(vm.LEAVE, nil)
+	bc.Instruction(vm.JUMP, startIndex)
+
+	bc.SetArg(frameIndex, bc.Len())
 
 	return nil
 }
@@ -320,7 +365,7 @@ func compileFunctionExpr(bc *vm.Bytecode, e *ast.FunctionExpr) error {
 		bc.Instruction(vm.DECLARE, argCountLabel)
 
 		bc.Instruction(vm.LOAD, argCountLabel)
-		bc.Instruction(vm.PUSH, len(e.Params))
+		bc.Instruction(vm.PUSH, len(e.Params)-1) // Variadic args do accept an empty array.
 		// Check if arg count matches or is greater
 		bc.Instruction(vm.CMP_GTE, nil)
 	}
@@ -342,7 +387,9 @@ func compileFunctionExpr(bc *vm.Bytecode, e *ast.FunctionExpr) error {
 		bc.Instruction(vm.DECLARE, param.Symbol)
 	}
 
-	if e.IsVariadic {
+	if !e.IsVariadic {
+
+	} else {
 		index := len(e.Params) - 1
 
 		// Calculate array size
@@ -353,9 +400,6 @@ func compileFunctionExpr(bc *vm.Bytecode, e *ast.FunctionExpr) error {
 		bc.Instruction(vm.ARR_CR, nil)
 
 		bc.Instruction(vm.DECLARE, e.Params[index].Symbol)
-	} else {
-		// Pop arg count
-		bc.Instruction(vm.POP, nil)
 	}
 
 	if err := compileBlockStmt(bc, e.Body, false); err != nil {
@@ -402,7 +446,11 @@ func compileCallExpr(bc *vm.Bytecode, e *ast.CallExpr) error {
 		return err
 	}
 
+	frameReturnIndex := bc.Len()
+	bc.Instruction(vm.FRAME, -1)
+
 	bc.Instruction(vm.CALL, nil)
+	bc.SetArg(frameReturnIndex, bc.Len())
 
 	return nil
 }

@@ -42,6 +42,7 @@ const (
 	JUMP_T
 	// JUMP_F <index> Will jump to given index if the top of the stack is  false.
 	JUMP_F
+	// Deprecated: Will be removed.
 	// JUMP_S Will jump to the index given on the top of the stack.
 	JUMP_S
 
@@ -49,12 +50,14 @@ const (
 	ENTER
 	LEAVE
 
-	// ECALL Used to call an external function.
-	ECALL
-	// CALL Used to call an internal function.
+	// CALL Used to call a function.
 	CALL
-	// RET Return to index *after* function call.
+	// FRAME <return_index> Used to initialize a new frame.
+	FRAME
+	// RET Return to ending position of frame and discard it.
 	RET
+	// JUMP_B Returns to the instruction after beginning of the last frame while keeping it. <=> RET
+	JUMP_B
 
 	// ARR_CR Creates an array. Array size on top of stack followed by elements.
 	ARR_CR

@@ -4,23 +4,24 @@ func newFrame(parent *Frame) *Frame {
 	return &Frame{
 		Parent:   parent,
 		Declared: make(map[string]any),
-		origin:   -1,
+		start:    -1,
+		end:      -1,
 	}
 }
 
 type Frame struct {
 	Parent   *Frame
 	Declared map[string]any
-	// origin is the index of the instruction which invoked the function.
-	origin int
+	// end is the index of the instruction which invoked the function.
+	start, end int
 }
 
-func (f *Frame) Origin() (*Frame, int) {
-	if f.Parent != nil && f.origin < 0 {
-		return f.Parent.Origin()
+func (f *Frame) End() (*Frame, int) {
+	if f.Parent != nil && f.end < 0 {
+		return f.Parent.End()
 	}
 
-	return f, f.origin
+	return f, f.end
 }
 
 func (f *Frame) Assign(name string, v any) {

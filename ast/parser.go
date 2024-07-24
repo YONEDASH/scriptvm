@@ -125,6 +125,12 @@ func (p *parser) parseStmt() (Stmt, error) {
 		return p.parseConditionalStmt()
 	case lexer.RETURN:
 		return p.parseReturnStmt()
+	case lexer.FOR:
+		return p.parseForStmt()
+	case lexer.CONTINUE:
+		return &ContinueStmt{p.consume()}, nil
+	case lexer.BREAK:
+		return &BreakStmt{p.consume()}, nil
 	default:
 	}
 
@@ -150,6 +156,8 @@ func (p *parser) parseStmt() (Stmt, error) {
 		default:
 			return nil, lexer.NewTokError(p.get(1), "expected statement (subscript)")
 		}
+	case *CallExpr:
+		return p.parseCallStmt(n)
 	default:
 		return nil, lexer.NewTokError(p.get(1), fmt.Sprintf("expected statement (%T)", n))
 	}
@@ -753,4 +761,28 @@ func (p *parser) parseCommaSeparatedIdent(end []lexer.TokenId) ([]*Identifier, e
 	}
 
 	return list, nil
+}
+
+func (p *parser) parseForStmt() (Stmt, error) {
+	if _, err := p.expect(lexer.FOR, "expected for"); err != nil {
+		return nil, err
+	}
+
+	block, err := p.parseBlockStmt()
+	if err != nil {
+		return nil, err
+	}
+
+	stmt := &ForStmt{
+		Block: block,
+	}
+
+	return stmt, nil
+}
+
+func (p *parser) parseCallStmt(n *CallExpr) (Stmt, error) {
+	return &AssignStmt{
+		Ident: nil,
+		Expr:  n,
+	}, nil
 }

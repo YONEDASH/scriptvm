@@ -256,19 +256,20 @@ func (r *ReturnStmt) String() string {
 
 func (r *ReturnStmt) stmt() {}
 
-type LoopStmt struct {
+type ForStmt struct {
+	Pre   Stmt
 	Block *BlockStmt
 }
 
-func (l *LoopStmt) Tok() lexer.Token {
+func (l *ForStmt) Tok() lexer.Token {
 	return l.Block.Tok()
 }
 
-func (l *LoopStmt) String() string {
+func (l *ForStmt) String() string {
 	return script.Stringify(l)
 }
 
-func (l *LoopStmt) stmt() {}
+func (l *ForStmt) stmt() {}
 
 type BreakStmt struct {
 	tok lexer.Token
@@ -295,3 +296,19 @@ func (c *ContinueStmt) Tok() lexer.Token {
 func (c *ContinueStmt) String() string {
 	return script.Stringify(c)
 }
+
+func (c *ContinueStmt) stmt() {}
+
+type exprStmt struct {
+	Expr Expr
+}
+
+func (e *exprStmt) Tok() lexer.Token {
+	return e.Expr.Tok()
+}
+
+func (e *exprStmt) String() string {
+	return script.Stringify(e)
+}
+
+func (e *exprStmt) stmt() {}

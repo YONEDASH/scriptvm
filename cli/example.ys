@@ -1,13 +1,9 @@
-calc := fn(a,b,c) {
-    return int(a) + int(b) + int(c)
+i := 0
+for {
+    i = i + 1
+    if i < 5 {
+        println(i)
+        continue
+    }
+    break
 }
-
-result := calc(10/3,int(10/3),!bool(0))
-
-
-x := 0
-y := fn(arg0, arg1...) {
-    x = arg0
-    y = arg1
-    return arg1
-}(42, 1, 2, 3)

@@ -9,43 +9,39 @@ import (
 
 func New() *VM {
 	vm := &VM{
-		stack:  make(Stack, 0, 16),
-		global: newFrame(nil),
+		stack:  newStack(),
+		cframe: newFrame(nil),
 	}
 
-	vm.global.Declare("int", Type{Int})
-	vm.global.Declare("float", Type{Float})
-	vm.global.Declare("bool", Type{Bool})
+	vm.cframe.Declare("int", Type{Int})
+	vm.cframe.Declare("float", Type{Float})
+	vm.cframe.Declare("bool", Type{Bool})
 
-	vm.global.Declare("println", NewExternalFunc(func(v ...any) {
+	vm.cframe.Declare("println", NewExternalFunc(func(v ...any) {
 		fmt.Println(v...)
-	}))
-
-	vm.global.Declare("test", NewExternalFunc(func(do func() int) int {
-		return do() * 2
 	}))
 
 	return vm
 }
 
 type VM struct {
-	global *Frame
+	cframe *Frame
 	stack  Stack
 }
 
 func (vm *VM) Dump() string {
-	dump := "## STACK ##\n"
-	dump += script.Stringify(vm.stack) + "\n"
+	//dump := "## STACK ##\n"
+	//dump += script.Stringify(vm.stack) + "\n"
 
-	dump += "## GLOBAL ##\n"
-	dump += script.Stringify(vm.global) + "\n"
+	dump := "## GLOBAL ##\n"
+	dump += script.Stringify(vm.cframe) + "\n"
 
 	return dump
 }
 
 const (
-	debugInstructions = false
-	debugStack        = false
+	debugInstructions = true
+	debugStack        = true
 )
 
 func (vm *VM) Execute(bc Bytecode) error {
@@ -100,14 +96,12 @@ func (vm *VM) Execute(bc Bytecode) error {
 				i = instr.Arg.(int) - 1
 			}
 		case ENTER:
-			vm.global = newFrame(vm.global)
+			vm.cframe = newFrame(vm.cframe)
 		case LEAVE:
-			if vm.global.Parent == nil {
-				return fmt.Errorf("cannot leave global scope")
+			if vm.cframe.Parent == nil {
+				return fmt.Errorf("cannot leave cframe scope")
 			}
-			vm.global = vm.global.Parent
-		case ECALL:
-		//vm.call(instr.Arg)
+			vm.cframe = vm.cframe.Parent
 		case CALL:
 			vm.call(&i)
 		case RET:
@@ -122,25 +116,49 @@ func (vm *VM) Execute(bc Bytecode) error {
 			vm.arrayIndex()
 		case ARR_V:
 			vm.arraySet()
+		case FRAME:
+			vm.frame(i, instr.Arg.(int))
+		case JUMP_B:
+			var err error
+			i, err = vm.jump_b(i)
+			if err != nil {
+				return err
+			}
 		case PANIC:
-			log.Fatalf("panic at %d: %v", i, instr.Arg)
+			return fmt.Errorf("panic at %d: %v", i, instr.Arg)
 		default:
-			return fmt.Errorf("unknown opcode %vm in instruction %d", instr.Op, i)
+			return fmt.Errorf("unknown opcode %v in instruction %d", instr.Op, i)
 		}
 		if debugStack {
-			fmt.Println(strings.TrimSpace(strings.ReplaceAll(script.Stringify(vm.stack), "\n", "")))
+			c := max(0, vm.stack.Cursor+1)
+			fmt.Println(strings.TrimSpace(strings.ReplaceAll(script.Stringify(vm.stack.Array[:c]), "\n", "")))
 		}
 	}
+
+	if vm.stack.Len() > 0 {
+		return fmt.Errorf("memory leak: stack size is %d", vm.stack.Len())
+	}
+
 	return nil
 }
 
 func (vm *VM) ret(i int) (int, error) {
-	if vm.global.Parent == nil {
+	if vm.cframe.Parent == nil {
 		return 0, fmt.Errorf("cannot return without a frame")
 	}
-	p, index := vm.global.Origin()
-	vm.global = p.Parent //return
+	p, index := vm.cframe.End()
+	vm.cframe = p.Parent //return
 	i = index - 1
+	return i, nil
+}
+
+func (vm *VM) jump_b(i int) (int, error) {
+	if vm.cframe.Parent == nil {
+		return 0, fmt.Errorf("cannot jump_b without a frame")
+	}
+	p, _ := vm.cframe.End()
+	vm.cframe = p //return to original frame
+	i = p.start
 	return i, nil
 }
 
@@ -287,16 +305,16 @@ func (vm *VM) cmp(code OpCode) {
 }
 
 func (vm *VM) declare(s string) {
-	vm.global.Declare(string(s), vm.stack.Pop())
+	vm.cframe.Declare(string(s), vm.stack.Pop())
 }
 
 func (vm *VM) load(key string) {
-	val := vm.global.Get(string(key))
+	val := vm.cframe.Get(string(key))
 	vm.stack.Push(val)
 }
 
 func (vm *VM) store(s string) {
-	vm.global.Assign(string(s), vm.stack.Pop())
+	vm.cframe.Assign(string(s), vm.stack.Pop())
 }
 
 func (vm *VM) arrayCreate() {
@@ -347,7 +365,12 @@ func (vm *VM) call(i *int) {
 
 	switch t := top.(type) {
 	case Type:
+		// Cast
 		vm.cast(t.Id)
+		// Pop arg count
+		vm.stack.Pop()
+		// Return
+		*i, _ = vm.ret(*i)
 		return
 	case Func:
 		address = t.Address
@@ -357,14 +380,18 @@ func (vm *VM) call(i *int) {
 		vm.stack.Push(result)
 		return
 	default:
-		log.Fatalf("cannot call non-function %v", top)
+		log.Fatalf("cannot call non-function %v @ %d", top, *i)
 		return
 	}
 
-	f := newFrame(vm.global)
-	f.origin = *i + 1
-	vm.global = f
 	*i = address
+}
+
+func (vm *VM) frame(current, end int) {
+	f := newFrame(vm.cframe)
+	f.start = current
+	f.end = end
+	vm.cframe = f
 }
 
 func (vm *VM) cast(t TypeId) {
