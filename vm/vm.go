@@ -40,8 +40,8 @@ func (vm *VM) Dump() string {
 }
 
 const (
-	debugInstructions = true
-	debugStack        = true
+	debugInstructions = false
+	debugStack        = false
 )
 
 func (vm *VM) Execute(bc Bytecode) error {
@@ -377,6 +377,8 @@ func (vm *VM) call(i *int) {
 	case ExternalFunc:
 		argCount := vm.stack.Pop().(int)
 		result := t.Callback(vm, argCount)
+		// Return
+		*i, _ = vm.ret(*i)
 		vm.stack.Push(result)
 		return
 	default:
