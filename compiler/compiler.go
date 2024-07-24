@@ -151,36 +151,42 @@ func compileReturnStmt(bc *vm.Bytecode, s *ast.ReturnStmt) error {
 }
 
 func compileForStmt(bc *vm.Bytecode, s *ast.ForStmt) error {
-	frameIndex := bc.Len()
-	bc.Instruction(vm.FRAME, -1)
-
-	startIndex := bc.Len()
 	bc.Instruction(vm.ENTER, nil)
 
-	if s.Pre != nil {
-		if err := compileStmt(bc, s.Pre); err != nil {
+	if s.Init != nil {
+		if err := compileStmt(bc, s.Init); err != nil {
 			return err
 		}
 	}
 
-	innerFrameIndex := bc.Len()
-	bc.Instruction(vm.FRAME, -1)
-
-	if block, ok := s.Stmt.(*ast.BlockStmt); ok {
-		if err := compileBlockStmt(bc, block, false); err != nil {
+	startIndex := bc.Len()
+	var jumpIndex int
+	if s.Cond != nil {
+		if err := compileExpr(bc, s.Cond); err != nil {
 			return err
 		}
-	} else {
-		if err := compileStmt(bc, block); err != nil {
+		jumpIndex = bc.Len()
+		bc.Instruction(vm.JUMP_F, nil)
+	}
+
+	//
+	if err := compileStmt(bc, s.Stmt); err != nil {
+		return err
+	}
+	//
+
+	if s.Update != nil {
+		if err := compileStmt(bc, s.Update); err != nil {
 			return err
 		}
 	}
 
-	bc.Instruction(vm.LEAVE, nil)
 	bc.Instruction(vm.JUMP, startIndex)
 
-	bc.SetArg(frameIndex, bc.Len())
-
+	if s.Cond != nil {
+		bc.SetArg(jumpIndex, bc.Len())
+	}
+	bc.Instruction(vm.LEAVE, nil)
 	return nil
 }
 

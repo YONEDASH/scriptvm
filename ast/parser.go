@@ -840,16 +840,10 @@ func (p *parser) parseForStmt() (Stmt, error) {
 	}
 
 	return &ForStmt{
-		Pre: init,
-		Stmt: &ConditionalStmt{
-			Cond:  check,
-			Block: &BlockStmt{},
-			Else: &BlockStmt{
-				Statements: []Stmt{
-					&BreakStmt{tok: p.get(0)},
-				},
-			},
-		},
+		Init:   init,
+		Cond:   check,
+		Update: update,
+		Stmt:   block,
 	}, nil
 }
 

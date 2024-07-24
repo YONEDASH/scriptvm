@@ -257,9 +257,9 @@ func (r *ReturnStmt) String() string {
 func (r *ReturnStmt) stmt() {}
 
 type ForStmt struct {
-	Pre  Stmt
-	Post Stmt
-	Stmt Stmt
+	Init, Update Stmt
+	Cond         Expr
+	Stmt         Stmt
 }
 
 func (l *ForStmt) Tok() lexer.Token {
