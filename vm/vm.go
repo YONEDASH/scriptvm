@@ -119,7 +119,7 @@ func (vm *VM) Execute(bc Bytecode) error {
 		case FRAME:
 			vm.frame(i, instr.Arg.(int))
 		case ANCHOR:
-			vm.cframe.anchor = true
+			vm.cframe.anchor = instr.Arg.(bool)
 		case RESCUE:
 			vm.cframe = vm.cframe.Anchor()
 		case JUMP_B:

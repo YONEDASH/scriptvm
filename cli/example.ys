@@ -1,9 +1,11 @@
 for i := 0, i < 10, i++ {
-    if i < 3 {
-        continue
+    for j := 0, j < 10, j++ {
+        if j < 3 {
+          continue
+        }
+        if j > 7 {
+           break
+        }
+        println(i,j)
     }
-    if i > 7 {
-        break
-    }
-    println(i)
 }

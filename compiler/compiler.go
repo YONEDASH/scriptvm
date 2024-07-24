@@ -156,6 +156,7 @@ func (out *compiler) compileReturnStmt(s *ast.ReturnStmt) error {
 	return nil
 }
 
+// compileForStmt compiles a for statement. This is by far the messiest implementation. TODO make it better.
 func (out *compiler) compileForStmt(s *ast.ForStmt) error {
 	out.bc.Instruction(vm.ENTER, nil)
 
@@ -165,7 +166,7 @@ func (out *compiler) compileForStmt(s *ast.ForStmt) error {
 		}
 	}
 
-	out.bc.Instruction(vm.ANCHOR, nil)
+	out.bc.Instruction(vm.ANCHOR, true)
 
 	// BREAK
 	skipBreakIndex := out.bc.Len()
@@ -214,6 +215,7 @@ func (out *compiler) compileForStmt(s *ast.ForStmt) error {
 	}
 	out.bc.SetArg(endJumpIndex, out.bc.Len())
 
+	out.bc.Instruction(vm.ANCHOR, false)
 	out.bc.Instruction(vm.LEAVE, nil)
 	return nil
 }
