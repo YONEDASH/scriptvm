@@ -6,6 +6,7 @@ import (
 	"script/lexer"
 	"script/vm"
 	"strconv"
+	"strings"
 )
 
 type compiler struct {
@@ -252,6 +253,10 @@ func (out *compiler) compileExpr(expr ast.Expr) error {
 		if err := out.compileArrayExpr(e); err != nil {
 			return err
 		}
+	case *ast.NewExpr:
+		if err := out.compileNewExpr(e); err != nil {
+			return err
+		}
 	default:
 		return ast.NewNodeError(expr, fmt.Sprintf("unknown expression type %T", expr))
 	}
@@ -273,11 +278,20 @@ func (out *compiler) compileArrayAssignStmt(s *ast.ArrayAssignStmt) error {
 }
 
 func (out *compiler) compileNumber(e *ast.Number) error {
-	f, err := strconv.ParseFloat(e.Value, 64)
-	if err != nil {
-		panic(err)
+	if strings.Contains(e.Value, ".") {
+		f, err := strconv.ParseFloat(e.Value, 64)
+		if err != nil {
+			return err
+		}
+		out.bc.Instruction(vm.PUSH, f)
+	} else {
+		i, err := strconv.Atoi(e.Value)
+		if err != nil {
+			return err
+		}
+		out.bc.Instruction(vm.PUSH, i)
 	}
-	out.bc.Instruction(vm.PUSH, f)
+
 	return nil
 }
 
@@ -521,5 +535,23 @@ func (out *compiler) compileSubscriptExpr(e *ast.SubscriptExpr) error {
 		return err
 	}
 	out.bc.Instruction(vm.ARR_ID, nil)
+	return nil
+}
+
+func (out *compiler) compileNewExpr(e *ast.NewExpr) error {
+	switch e.TypeName.Symbol {
+	case "array":
+		if e.Expression != nil {
+			if err := out.compileExpr(e.Expression); err != nil {
+				return err
+			}
+		} else {
+			out.bc.Instruction(vm.PUSH, 0)
+		}
+		out.bc.Instruction(vm.ARR_INIT, nil)
+	default:
+		return ast.NewNodeError(e, fmt.Sprintf("cannot create type with new %s", e.TypeName.Symbol))
+	}
+
 	return nil
 }

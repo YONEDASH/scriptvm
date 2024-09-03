@@ -1,11 +1,5 @@
-for i := 0, i < 10, i++ {
-    for j := 0, j < 10, j++ {
-        if j < 3 {
-          continue
-        }
-        if j > 7 {
-           break
-        }
-        println(i,j)
-    }
+n := 0
+for ,n < 100000, {
+    n++
 }
+println(n)

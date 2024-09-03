@@ -9,18 +9,19 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[Invalid-0]
-	_ = x[Any-1]
-	_ = x[Int-2]
-	_ = x[Float-3]
-	_ = x[Bool-4]
-	_ = x[Function-5]
-	_ = x[Array-6]
-	_ = x[ExternalFunction-7]
+	_ = x[Nil-1]
+	_ = x[Any-2]
+	_ = x[Int-3]
+	_ = x[Float-4]
+	_ = x[Bool-5]
+	_ = x[Function-6]
+	_ = x[Array-7]
+	_ = x[ExternalFunction-8]
 }
 
-const _TypeId_name = "InvalidAnyIntFloatBoolFunctionArrayExternalFunction"
+const _TypeId_name = "InvalidNilAnyIntFloatBoolFunctionArrayExternalFunction"
 
-var _TypeId_index = [...]uint8{0, 7, 10, 13, 18, 22, 30, 35, 51}
+var _TypeId_index = [...]uint8{0, 7, 10, 13, 16, 21, 25, 33, 38, 54}
 
 func (i TypeId) String() string {
 	if i >= TypeId(len(_TypeId_index)-1) {

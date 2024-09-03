@@ -10,6 +10,7 @@ type TypeId uint8
 
 const (
 	Invalid TypeId = iota
+	Nil
 	Any
 	Int
 	Float
@@ -20,6 +21,9 @@ const (
 )
 
 func TypeOf(v any) TypeId {
+	if v == nil {
+		return Nil
+	}
 	switch v.(type) {
 	case int:
 		return Int
@@ -34,6 +38,7 @@ func TypeOf(v any) TypeId {
 	case any:
 		return Any
 	default:
+		fmt.Printf("undefined type %T of %v\n", v, v)
 		return Invalid
 	}
 }

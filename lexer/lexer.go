@@ -93,10 +93,16 @@ func (t *tokenizer) pushBuffer() {
 
 // number Pushes a number token to the tokens list.
 func (t *tokenizer) number() {
+	dots := 0
 	end := 1
-	for unicode.IsDigit(t.get(end)) {
+	for unicode.IsDigit(t.get(end)) || (t.get(end) == '.' && dots == 0) {
+		if t.get(end) == '.' && dots == 0 {
+			dots++
+		}
+
 		end++
 	}
+
 	t.push(NUMBER, t.lex(0, end))
 }
 
@@ -192,6 +198,10 @@ func Tokenize(input []byte) ([]Token, []error) {
 		case ',':
 			tr.push(COMMA, tr.lex(0, 1))
 		case '.':
+			if unicode.IsDigit(tr.get(1)) {
+				tr.number()
+				continue
+			}
 			if tr.get(1) == tr.get(2) && tr.get(2) == '.' {
 				tr.push(DOT_DOT_DOT, tr.lex(0, 3))
 				continue

@@ -14,7 +14,7 @@ import (
 //go:embed example.ys
 var example string
 
-const debug = true
+const debug = false
 
 func main() {
 	//fmt.Println("### Script ###")

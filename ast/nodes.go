@@ -163,6 +163,21 @@ func (a *ArrayExpr) String() string {
 
 func (a *ArrayExpr) expr() {}
 
+type NewExpr struct {
+	TypeName   *Identifier
+	Expression Expr
+}
+
+func (n *NewExpr) Tok() lexer.Token {
+	return n.TypeName.Tok()
+}
+
+func (n *NewExpr) String() string {
+	return script.Stringify(n)
+}
+
+func (n *NewExpr) expr() {}
+
 type DeclareStmt struct {
 	Ident *Identifier
 	Expr  Expr

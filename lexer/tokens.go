@@ -47,6 +47,11 @@ const (
 	EQUALS_EQUALS
 	EXCLAMATION_EQUALS
 
+	PLUS_EQUALS
+	MINUS_EQUALS
+	ASTERISK_EQUALS
+	SLASH_EQUALS
+
 	PLUS_PLUS
 	MINUS_MINUS
 
@@ -71,6 +76,7 @@ const (
 	CONTINUE
 	BREAK
 	FN
+	NEW
 )
 
 var keywords = map[string]TokenId{
@@ -81,4 +87,5 @@ var keywords = map[string]TokenId{
 	"continue": CONTINUE,
 	"break":    BREAK,
 	"fn":       FN,
+	"new":      NEW,
 }

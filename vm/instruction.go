@@ -62,6 +62,8 @@ const (
 	ANCHOR
 	RESCUE
 
+	// ARR_INIT Creates an array. Array size on top of stack.
+	ARR_INIT
 	// ARR_CR Creates an array. Array size on top of stack followed by elements.
 	ARR_CR
 	// ARR_ID Indexes into an array. TypeId will be pushed on top of stack.

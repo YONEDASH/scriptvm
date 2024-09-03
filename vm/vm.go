@@ -25,8 +25,13 @@ func New() *VM {
 }
 
 type VM struct {
-	cframe *Frame
-	stack  Stack
+	cframe  *Frame
+	stack   Stack
+	pointer int
+}
+
+func (vm *VM) Err(msg string) {
+	log.Fatalf("error at %d: %s", vm.pointer, msg)
 }
 
 func (vm *VM) Dump() string {
@@ -49,8 +54,9 @@ func (vm *VM) Execute(bc Bytecode) error {
 		fmt.Println(strings.TrimSpace(strings.ReplaceAll(script.Stringify(vm.stack), "\n", "")))
 	}
 
-	for i := 0; i < len(bc); i++ {
-		instr := bc[i]
+	vm.pointer = 0
+	for ; vm.pointer < len(bc); vm.pointer++ {
+		instr := bc[vm.pointer]
 		if debugInstructions {
 			if instr.Arg != nil {
 				fmt.Println(instr.Op, instr.Arg)
@@ -84,16 +90,14 @@ func (vm *VM) Execute(bc Bytecode) error {
 		case STORE:
 			vm.store(instr.Arg.(string))
 		case JUMP:
-			i = instr.Arg.(int) - 1
-		case JUMP_S:
-			i = vm.stack.Pop().(int) - 1
+			vm.pointer = instr.Arg.(int) - 1
 		case JUMP_T:
 			if vm.popBool() {
-				i = instr.Arg.(int) - 1
+				vm.pointer = instr.Arg.(int) - 1
 			}
 		case JUMP_F:
 			if !vm.popBool() {
-				i = instr.Arg.(int) - 1
+				vm.pointer = instr.Arg.(int) - 1
 			}
 		case ENTER:
 			vm.cframe = newFrame(vm.cframe)
@@ -103,13 +107,15 @@ func (vm *VM) Execute(bc Bytecode) error {
 			}
 			vm.cframe = vm.cframe.Parent
 		case CALL:
-			vm.call(&i)
+			vm.call(&vm.pointer)
 		case RET:
 			var err error
-			i, err = vm.ret(i)
+			vm.pointer, err = vm.ret(vm.pointer)
 			if err != nil {
 				return err
 			}
+		case ARR_INIT:
+			vm.arrayInit()
 		case ARR_CR:
 			vm.arrayCreate()
 		case ARR_ID:
@@ -117,21 +123,21 @@ func (vm *VM) Execute(bc Bytecode) error {
 		case ARR_V:
 			vm.arraySet()
 		case FRAME:
-			vm.frame(i, instr.Arg.(int))
+			vm.frame(vm.pointer, instr.Arg.(int))
 		case ANCHOR:
 			vm.cframe.anchor = instr.Arg.(bool)
 		case RESCUE:
 			vm.cframe = vm.cframe.Anchor()
 		case JUMP_B:
 			var err error
-			i, err = vm.jump_b(i)
+			vm.pointer, err = vm.jump_b(vm.pointer)
 			if err != nil {
 				return err
 			}
 		case PANIC:
-			return fmt.Errorf("panic at %d: %v", i, instr.Arg)
+			return fmt.Errorf("panic at %d: %v", vm.pointer, instr.Arg)
 		default:
-			return fmt.Errorf("unknown opcode %v in instruction %d", instr.Op, i)
+			return fmt.Errorf("unknown opcode %v in instruction %d", instr.Op, vm.pointer)
 		}
 		if debugStack {
 			c := max(0, vm.stack.Cursor+1)
@@ -244,10 +250,17 @@ func (vm *VM) cmp(code OpCode) {
 	rType := TypeOf(right)
 
 	if lType != rType {
-		log.Fatalf("cannot compare different types %v and %v", lType, rType)
+		vm.Err(fmt.Sprintf("cannot compare different types %v and %v", lType, rType))
 	}
 
 	switch lType {
+	case Nil:
+		switch code {
+		case CMP:
+			vm.stack.Push(true)
+		default:
+			vm.Err(fmt.Sprintf("undefined comparison operation %v", code))
+		}
 	case Int:
 		if leftInt, ok := left.(int); ok {
 			if rightInt, ok := right.(int); ok {
@@ -263,11 +276,11 @@ func (vm *VM) cmp(code OpCode) {
 				case CMP_GTE:
 					vm.stack.Push(leftInt >= rightInt)
 				default:
-					log.Fatalf("undefined comparison operation %v", code)
+					vm.Err(fmt.Sprintf("undefined comparison operation %v", code))
 				}
 				return
 			}
-			log.Fatalf("cannot compare integer with non-integer %v", code)
+			vm.Err(fmt.Sprintf("cannot compare integer with non-integer %v", code))
 		}
 	case Float:
 		if leftFloat, ok := left.(float64); ok {
@@ -284,11 +297,11 @@ func (vm *VM) cmp(code OpCode) {
 				case CMP_GTE:
 					vm.stack.Push(leftFloat >= rightFloat)
 				default:
-					log.Fatalf("undefined comparison operation %v", code)
+					vm.Err(fmt.Sprintf("undefined comparison operation %v", code))
 				}
 				return
 			}
-			log.Fatalf("cannot compare number with non-number %v", code)
+			vm.Err(fmt.Sprintf("cannot compare number with non-number %v", code))
 		}
 	case Bool:
 		if leftBool, ok := left.(bool); ok {
@@ -297,14 +310,14 @@ func (vm *VM) cmp(code OpCode) {
 				case CMP:
 					vm.stack.Push(leftBool == rightBool)
 				default:
-					log.Fatalf("undefined comparison operation %v", code)
+					vm.Err(fmt.Sprintf("undefined comparison operation %v", code))
 				}
 				return
 			}
-			log.Fatalf("cannot compare boolean with non-boolean %v", code)
+			vm.Err(fmt.Sprintf("cannot compare boolean with non-boolean %v", code))
 		}
 	default:
-		log.Fatalf("undefined comparison for type %v of %v", lType, left)
+		vm.Err(fmt.Sprintf("undefined comparison for type %v of %v", lType, left))
 	}
 }
 
@@ -321,6 +334,12 @@ func (vm *VM) store(s string) {
 	vm.cframe.Assign(string(s), vm.stack.Pop())
 }
 
+func (vm *VM) arrayInit() {
+	size := vm.stack.Pop().(int)
+	arr := make([]any, size)
+	vm.stack.Push(arr)
+}
+
 func (vm *VM) arrayCreate() {
 	size := vm.stack.Pop().(int)
 	arr := make([]any, size)
@@ -331,7 +350,7 @@ func (vm *VM) arrayCreate() {
 }
 
 func (vm *VM) arrayIndex() {
-	index := int(vm.stack.Pop().(float64))
+	index := vm.stack.Pop().(int)
 	arr := vm.stack.Pop().([]any)
 
 	if index < 0 {
@@ -347,7 +366,7 @@ func (vm *VM) arrayIndex() {
 }
 
 func (vm *VM) arraySet() {
-	index := int(vm.stack.Pop().(float64))
+	index := vm.stack.Pop().(int)
 	arr := vm.stack.Pop().([]any)
 
 	if index < 0 {
@@ -369,10 +388,10 @@ func (vm *VM) call(i *int) {
 
 	switch t := top.(type) {
 	case Type:
-		// Cast
-		vm.cast(t.Id)
 		// Pop arg count
 		vm.stack.Pop()
+		// Cast
+		vm.cast(t.Id)
 		// Return
 		*i, _ = vm.ret(*i)
 		return

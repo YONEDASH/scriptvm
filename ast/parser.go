@@ -623,7 +623,7 @@ func (p *parser) parseCall() (Expr, error) {
 
 func (p *parser) parseFunctionExpr() (Expr, error) {
 	if p.get(0).Id != lexer.FN {
-		return p.parsePrimary()
+		return p.parseNewExpr()
 	}
 	p.consume()
 
@@ -654,6 +654,40 @@ func (p *parser) parseFunctionExpr() (Expr, error) {
 		Params:     idents,
 		Body:       block,
 		IsVariadic: variadic,
+	}, nil
+}
+
+func (p *parser) parseNewExpr() (Expr, error) {
+	if p.get(0).Id != lexer.NEW {
+		return p.parsePrimary()
+	}
+	p.consume()
+
+	if _, err := p.expect(lexer.OPEN_PAREN, "open paren in new"); err != nil {
+		return nil, err
+	}
+
+	typeName, err := p.parseIdent()
+	if err != nil {
+		return nil, err
+	}
+
+	var arg Expr
+	if p.get(0).Id == lexer.COMMA {
+		p.consume()
+		arg, err = p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := p.expect(lexer.CLOSE_PAREN, "close paren in new"); err != nil {
+		return nil, err
+	}
+
+	return &NewExpr{
+		TypeName:   typeName,
+		Expression: arg,
 	}, nil
 }
 
